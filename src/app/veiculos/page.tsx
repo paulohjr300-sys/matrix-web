@@ -39,12 +39,12 @@ type Vehicle = {
     purchase_price: number
     advertised_price: number
     status: string
-    brands?: { name: string } | null
-    vehicle_models?: { name: string } | null
-    engines?: { name: string } | null
-    transmissions?: { name: string } | null
-    fuels?: { name: string } | null
-    colors?: { name: string } | null
+    brands?: { name: string }[] | null
+    vehicle_models?: { name: string }[] | null
+    engines?: { name: string }[] | null
+    transmissions?: { name: string }[] | null
+    fuels?: { name: string }[] | null
+    colors?: { name: string }[] | null
 
 }
 
@@ -127,9 +127,9 @@ export default function VeiculosPage() {
     const filteredModels = models.filter((model) => model.brand_id === brandId)
 
     const filteredVehicles = vehicles.filter((vehicle) => {
-        const brandName = vehicle.brands?.name || ''
-        const modelName = vehicle.vehicle_models?.name || ''
-        const colorName = vehicle.colors?.name || ''
+        const brandName = vehicle.brands?.[0]?.name || ''
+        const modelName = vehicle.vehicle_models?.[0]?.name || ''
+        const colorName = vehicle.colors?.[0]?.name || ''
 
         const matchesSearch =
             vehicle.plate.toLowerCase().includes(search.toLowerCase()) ||
@@ -271,10 +271,16 @@ export default function VeiculosPage() {
     }
 
     useEffect(() => {
-        loadBrands()
-        loadModels()
-        loadOptions()
-        loadVehicles()
+        async function loadInitialData() {
+            await Promise.all([
+                loadBrands(),
+                loadModels(),
+                loadOptions(),
+                loadVehicles(),
+            ])
+        }
+
+        void loadInitialData()
     }, [])
 
     function handleBrandChange(value: string) {
@@ -671,11 +677,11 @@ export default function VeiculosPage() {
                                 >
 
                                     <td className="px-5 py-4 font-semibold">{vehicle.plate}</td>
-                                    <td className="px-5 py-4">{vehicle.brands?.name || '-'}</td>
-                                    <td className="px-5 py-4">{vehicle.vehicle_models?.name || '-'}</td>
-                                    <td className="px-5 py-4">{vehicle.colors?.name || '-'}</td>
-                                    <td className="px-5 py-4">{vehicle.engines?.name || '-'}</td>
-                                    <td className="px-5 py-4">{vehicle.transmissions?.name || '-'}</td>
+                                    <td className="px-5 py-4">{vehicle.brands?.[0]?.name || '-'}</td>
+                                    <td className="px-5 py-4">{vehicle.vehicle_models?.[0]?.name || '-'}</td>
+                                    <td className="px-5 py-4">{vehicle.colors?.[0]?.name || '-'}</td>
+                                    <td className="px-5 py-4">{vehicle.engines?.[0]?.name || '-'}</td>
+                                    <td className="px-5 py-4">{vehicle.transmissions?.[0]?.name || '-'}</td>
                                     <td className="px-5 py-4">
                                         {vehicle.manufacture_year || '-'}
                                         {vehicle.model_year ? `/${vehicle.model_year}` : ''}
