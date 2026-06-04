@@ -77,27 +77,35 @@ export default function ModelosPage() {
     async function loadModels() {
         const { data, error } = await supabase
             .from('vehicle_models')
-            .select('id, name, brand_id, brands(name)')
+            .select(`
+        id,
+        name,
+        brand_id,
+        brands (
+          name
+        )
+      `)
             .order('name')
 
         if (error) {
-            showToast('error', 'Erro', 'Não foi possível carregar os modelos.')
+            showToast('error', 'Erro', error.message)
             return
         }
 
-        setModels(data || [])
+        setModels((data || []) as VehicleModel[])
     }
 
     useEffect(() => {
-        const init = async () => {
+        async function loadInitialData() {
             await loadBrands()
             await loadModels()
         }
-        init()
+
+        loadInitialData()
     }, [])
 
     const filteredModels = models.filter((model) => {
-        const brandName = model.brands?.[0]?.name || ''
+        const brandName = getBrandName(model.brand_id)
 
         return (
             model.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -128,22 +136,20 @@ export default function ModelosPage() {
                 .eq('id', editingModelId)
 
             if (error) {
-                showToast('error', 'Erro', 'Não foi possível editar o modelo.')
+                showToast('error', 'Erro ao editar modelo', error.message)
                 setLoading(false)
                 return
             }
 
             showToast('success', 'Modelo atualizado', 'O modelo foi atualizado com sucesso.')
         } else {
-            const { error } = await supabase
-                .from('vehicle_models')
-                .insert({
-                    name: modelName.trim(),
-                    brand_id: brandId,
-                })
+            const { error } = await supabase.from('vehicle_models').insert({
+                name: modelName.trim(),
+                brand_id: brandId,
+            })
 
             if (error) {
-                showToast('error', 'Erro', 'Não foi possível cadastrar o modelo.')
+                showToast('error', 'Erro ao cadastrar modelo', error.message)
                 setLoading(false)
                 return
             }
@@ -156,6 +162,7 @@ export default function ModelosPage() {
         setEditingModelId(null)
         setShowForm(false)
         setLoading(false)
+
         await loadModels()
     }
 
@@ -177,7 +184,16 @@ export default function ModelosPage() {
             .eq('id', deleteModelId)
 
         if (error) {
-            showToast('error', 'Erro', 'Não foi possível excluir o modelo.')
+            if (error.code === '23503') {
+                showToast(
+                    'error',
+                    'Não foi possível excluir',
+                    'Este modelo está vinculado a um ou mais veículos.'
+                )
+            } else {
+                showToast('error', 'Erro ao excluir modelo', error.message)
+            }
+
             setDeleteLoading(false)
             return
         }
@@ -185,9 +201,12 @@ export default function ModelosPage() {
         showToast('success', 'Modelo excluído', 'O modelo foi removido com sucesso.')
         setDeleteModelId(null)
         setDeleteLoading(false)
+
         await loadModels()
     }
-
+    function getBrandName(brandId: string) {
+        return brands.find((brand) => brand.id === brandId)?.name || 'Sem marca vinculada'
+    }
     return (
         <>
             <PageContainer
@@ -236,9 +255,7 @@ export default function ModelosPage() {
                             </div>
 
                             <div>
-                                <label className="text-sm font-medium text-zinc-700">
-                                    Marca
-                                </label>
+                                <label className="text-sm font-medium text-zinc-700">Marca</label>
 
                                 <select
                                     value={brandId}
@@ -302,7 +319,10 @@ export default function ModelosPage() {
                                     className="border-t transition-colors duration-200 hover:bg-zinc-50"
                                 >
                                     <td className="px-5 py-4 font-semibold">{model.name}</td>
-                                    <td className="px-5 py-4">{model.brands?.[0]?.name || '-'}</td>
+
+                                    <td className="px-5 py-4">
+                                        {getBrandName(model.brand_id)}
+                                    </td>
 
                                     <td className="px-5 py-4">
                                         <div className="flex justify-end gap-2">
