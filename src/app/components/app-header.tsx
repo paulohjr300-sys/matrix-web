@@ -8,19 +8,20 @@ interface AppHeaderProps {
     description?: string
 }
 
-type UserProfile = {
-    name: string
-    role: string
-}
+export function AppHeader({ title, description }: AppHeaderProps) {
+    const [userProfile, setUserProfile] = useState(() => {
+        if (typeof window === 'undefined') {
+            return {
+                name: 'Usuário',
+                role: '',
+            }
+        }
 
-export function AppHeader({
-    title,
-    description,
-}: AppHeaderProps) {
-    const [userProfile] = useState<UserProfile>(() => ({
-        name: localStorage.getItem('matrix_name') || '',
-        role: localStorage.getItem('matrix_role') || '',
-    }))
+        const name = window.localStorage.getItem('matrix_name') || 'Usuário'
+        const role = window.localStorage.getItem('matrix_role') || ''
+
+        return { name, role }
+    })
 
     return (
         <header className="sticky top-0 z-20 border-b border-zinc-200 bg-zinc-100/80 px-8 py-5 backdrop-blur">
@@ -31,9 +32,7 @@ export function AppHeader({
                     </h1>
 
                     {description && (
-                        <p className="mt-1 text-sm text-zinc-500">
-                            {description}
-                        </p>
+                        <p className="mt-1 text-sm text-zinc-500">{description}</p>
                     )}
                 </div>
 
@@ -53,7 +52,7 @@ export function AppHeader({
 
                         <div className="hidden md:block">
                             <p className="text-sm font-bold text-zinc-950">
-                                {userProfile.name || 'Usuário'}
+                                {userProfile.name}
                             </p>
 
                             <p className="text-xs font-medium text-zinc-500">
