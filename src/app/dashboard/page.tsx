@@ -22,8 +22,8 @@ type VehicleDashboard = {
   advertised_price: number
   status: string
   created_at: string
-  brands?: { name: string } | null
-  vehicle_models?: { name: string } | null
+  brands?: { name: string }[] | null
+  vehicle_models?: { name: string }[] | null
   vehicle_costs?: { amount: number }[]
   vehicle_sales?: { sale_price: number; sale_date: string }[]
 }
@@ -36,8 +36,10 @@ function formatCurrency(value: number) {
 }
 
 function getVehicleName(vehicle: VehicleDashboard) {
-  return `${vehicle.plate} - ${vehicle.brands?.name || ''} ${vehicle.vehicle_models?.name || ''
-    }`
+  const brandName = vehicle.brands?.[0]?.name || ''
+  const modelName = vehicle.vehicle_models?.[0]?.name || ''
+
+  return `${vehicle.plate} - ${brandName} ${modelName}`
 }
 
 function getNumbers(vehicle: VehicleDashboard) {
@@ -112,27 +114,27 @@ function getStatusClass(status: string) {
 export default function DashboardPage() {
   const [vehicles, setVehicles] = useState<VehicleDashboard[]>([])
 
-  async function loadDashboard() {
-    const { data } = await supabase
-      .from('vehicles')
-      .select(`
-        id,
-        plate,
-        purchase_price,
-        advertised_price,
-        status,
-        created_at,
-        brands(name),
-        vehicle_models(name),
-        vehicle_costs(amount),
-        vehicle_sales(sale_price, sale_date)
-      `)
-      .order('created_at', { ascending: false })
-
-    setVehicles((data || []) as VehicleDashboard[])
-  }
-
   useEffect(() => {
+    async function loadDashboard() {
+      const { data } = await supabase
+        .from('vehicles')
+        .select(`
+          id,
+          plate,
+          purchase_price,
+          advertised_price,
+          status,
+          created_at,
+          brands(name),
+          vehicle_models(name),
+          vehicle_costs(amount),
+          vehicle_sales(sale_price, sale_date)
+        `)
+        .order('created_at', { ascending: false })
+
+      setVehicles((data || []) as VehicleDashboard[])
+    }
+
     loadDashboard()
   }, [])
 
@@ -324,8 +326,8 @@ export default function DashboardPage() {
 
                     <span
                       className={`rounded-full px-3 py-1 text-xs font-bold ${numbers.estimatedProfit < 0
-                          ? 'bg-red-400/20 text-red-200'
-                          : 'bg-amber-400/20 text-amber-200'
+                        ? 'bg-red-400/20 text-red-200'
+                        : 'bg-amber-400/20 text-amber-200'
                         }`}
                     >
                       {numbers.estimatedProfit < 0

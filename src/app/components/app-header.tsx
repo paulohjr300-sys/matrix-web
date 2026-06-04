@@ -1,7 +1,7 @@
 'use client'
 
 import { Bell, User } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 
 interface AppHeaderProps {
     title: string
@@ -17,20 +17,10 @@ export function AppHeader({
     title,
     description,
 }: AppHeaderProps) {
-    const [userProfile, setUserProfile] = useState<UserProfile>({
-        name: '',
-        role: '',
-    })
-
-    useEffect(() => {
-        const name = localStorage.getItem('matrix_name') || ''
-        const role = localStorage.getItem('matrix_role') || ''
-
-        setUserProfile({
-            name,
-            role,
-        })
-    }, [])
+    const [userProfile] = useState<UserProfile>(() => ({
+        name: localStorage.getItem('matrix_name') || '',
+        role: localStorage.getItem('matrix_role') || '',
+    }))
 
     return (
         <header className="sticky top-0 z-20 border-b border-zinc-200 bg-zinc-100/80 px-8 py-5 backdrop-blur">

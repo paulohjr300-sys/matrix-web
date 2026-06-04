@@ -19,7 +19,7 @@ type VehicleModel = {
     brand_id: string
     brands?: {
         name: string
-    }
+    }[] | null
 }
 
 export default function ModelosPage() {
@@ -89,12 +89,15 @@ export default function ModelosPage() {
     }
 
     useEffect(() => {
-        loadBrands()
-        loadModels()
+        const init = async () => {
+            await loadBrands()
+            await loadModels()
+        }
+        init()
     }, [])
 
     const filteredModels = models.filter((model) => {
-        const brandName = model.brands?.name || ''
+        const brandName = model.brands?.[0]?.name || ''
 
         return (
             model.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -299,7 +302,7 @@ export default function ModelosPage() {
                                     className="border-t transition-colors duration-200 hover:bg-zinc-50"
                                 >
                                     <td className="px-5 py-4 font-semibold">{model.name}</td>
-                                    <td className="px-5 py-4">{model.brands?.name || '-'}</td>
+                                    <td className="px-5 py-4">{model.brands?.[0]?.name || '-'}</td>
 
                                     <td className="px-5 py-4">
                                         <div className="flex justify-end gap-2">

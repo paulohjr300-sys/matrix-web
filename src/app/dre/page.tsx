@@ -19,8 +19,8 @@ type VehicleDre = {
     purchase_price: number
     advertised_price: number
     status: string
-    brands?: { name: string } | null
-    vehicle_models?: { name: string } | null
+    brands?: { name: string }[] | null
+    vehicle_models?: { name: string }[] | null
     vehicle_costs?: {
         amount: number
     }[]
@@ -41,8 +41,11 @@ function formatPercent(value: number) {
 }
 
 function getVehicleName(vehicle: VehicleDre) {
-    return `${vehicle.plate} - ${vehicle.brands?.name || ''} ${vehicle.vehicle_models?.name || ''
-        }`
+    const brandName = vehicle.brands?.[0]?.name || ''
+    const modelName = vehicle.vehicle_models?.[0]?.name || ''
+    const details = [brandName, modelName].filter(Boolean).join(' ')
+
+    return `${vehicle.plate}${details ? ` - ${details}` : ''}`
 }
 
 function getStatusBadge(status: string) {
@@ -135,32 +138,42 @@ export default function DrePage() {
         }, 3000)
     }
 
-    async function loadDre() {
-        const { data, error } = await supabase
-            .from('vehicles')
-            .select(`
-        id,
-        plate,
-        purchase_price,
-        advertised_price,
-        status,
-        brands(name),
-        vehicle_models(name),
-        vehicle_costs(amount),
-        vehicle_sales(sale_price)
-      `)
-            .order('created_at', { ascending: false })
+    useEffect(() => {
+        let isMounted = true
 
-        if (error) {
-            showToast('error', 'Erro ao carregar DRE', error.message)
-            return
+        async function loadDre() {
+            const { data, error } = await supabase
+                .from('vehicles')
+                .select(`
+            id,
+            plate,
+            purchase_price,
+            advertised_price,
+            status,
+            brands(name),
+            vehicle_models(name),
+            vehicle_costs(amount),
+            vehicle_sales(sale_price)
+          `)
+                .order('created_at', { ascending: false })
+
+            if (!isMounted) {
+                return
+            }
+
+            if (error) {
+                showToast('error', 'Erro ao carregar DRE', error.message)
+                return
+            }
+
+            setVehicles((data || []) as VehicleDre[])
         }
 
-        setVehicles((data || []) as VehicleDre[])
-    }
-
-    useEffect(() => {
         loadDre()
+
+        return () => {
+            isMounted = false
+        }
     }, [])
 
     const filteredVehicles = vehicles.filter((vehicle) => {

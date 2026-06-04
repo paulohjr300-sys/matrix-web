@@ -61,7 +61,11 @@ export default function MarcasPage() {
     }
 
     useEffect(() => {
-        loadBrands()
+        async function fetchBrands() {
+            await loadBrands()
+        }
+
+        fetchBrands()
     }, [])
 
     async function handleSaveBrand() {

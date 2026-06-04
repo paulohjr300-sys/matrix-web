@@ -11,8 +11,8 @@ import { Pencil, Trash2 } from 'lucide-react'
 type Vehicle = {
   id: string
   plate: string
-  brands?: { name: string } | null
-  vehicle_models?: { name: string } | null
+  brands?: { name: string }[] | { name: string } | null
+  vehicle_models?: { name: string }[] | { name: string } | null
 }
 
 type VehicleCost = {
@@ -22,7 +22,7 @@ type VehicleCost = {
   category: string | null
   amount: number
   cost_date: string | null
-  vehicles?: Vehicle | null
+  vehicles?: Vehicle | Vehicle[] | null
 }
 
 const costCategories = [
@@ -57,13 +57,20 @@ function formatDate(date?: string | null) {
   return `${day}/${month}/${year}`
 }
 
-function getVehicleLabel(vehicle?: Vehicle | null) {
+function getVehicleLabel(vehicle?: Vehicle | Vehicle[] | null) {
   if (!vehicle) return '-'
 
-  const brand = vehicle.brands?.name || ''
-  const model = vehicle.vehicle_models?.name || ''
+  const currentVehicle = Array.isArray(vehicle) ? vehicle[0] : vehicle
+  if (!currentVehicle) return '-'
 
-  return `${vehicle.plate} - ${brand} ${model}`.trim()
+  const brand = Array.isArray(currentVehicle.brands)
+    ? currentVehicle.brands[0]?.name || ''
+    : currentVehicle.brands?.name || ''
+  const model = Array.isArray(currentVehicle.vehicle_models)
+    ? currentVehicle.vehicle_models[0]?.name || ''
+    : currentVehicle.vehicle_models?.name || ''
+
+  return `${currentVehicle.plate} - ${brand} ${model}`.trim()
 }
 
 export default function CustosPage() {
@@ -175,8 +182,12 @@ export default function CustosPage() {
   }
 
   useEffect(() => {
-    loadVehicles()
-    loadCosts()
+    async function loadData() {
+      await loadVehicles()
+      await loadCosts()
+    }
+
+    void loadData()
   }, [])
 
   async function handleSaveCost() {
