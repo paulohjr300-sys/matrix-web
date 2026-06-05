@@ -268,7 +268,7 @@ export default function VeiculosPage() {
             return
         }
 
-        setVehicles((data || []) as Vehicle[])
+        setVehicles((data || []) as unknown as Vehicle[])
     }
 
     useEffect(() => {
