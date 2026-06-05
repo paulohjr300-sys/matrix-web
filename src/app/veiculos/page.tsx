@@ -1,13 +1,13 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { PageContainer } from '../components/page-container'
 import { CurrencyInput } from '../components/currency-input'
 import { Toast } from '../components/ui/toast'
 import { ConfirmDialog } from '../components/ui/confirm-dialog'
 import { supabase } from '../lib/supabase'
 import { Eye, Pencil, Trash2 } from 'lucide-react'
-import Link from 'next/link'
 
 type Brand = {
     id: string
@@ -39,6 +39,9 @@ type Vehicle = {
     km: number | null
     purchase_price: number
     advertised_price: number
+    chassi: string | null
+    renavam: string | null
+    notes: string | null
     status: string
     brands?: { name: string } | null
     vehicle_models?: { name: string } | null
@@ -46,7 +49,6 @@ type Vehicle = {
     transmissions?: { name: string } | null
     fuels?: { name: string } | null
     colors?: { name: string } | null
-
 }
 
 const statusOptions = [
@@ -67,6 +69,14 @@ function parseCurrency(value: string) {
     return Number(onlyNumbers) / 100
 }
 
+function formatChassi(value: string) {
+    return value.toUpperCase().replace(/\s/g, '').slice(0, 17)
+}
+
+function formatRenavam(value: string) {
+    return value.replace(/\D/g, '').slice(0, 11)
+}
+
 function getStatusLabel(status: string) {
     return statusOptions.find((item) => item.value === status)?.label || status
 }
@@ -81,6 +91,9 @@ function getStatusClass(status: string) {
 
         case 'VENDIDO':
             return 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200'
+
+        default:
+            return 'bg-zinc-100 text-zinc-700 ring-1 ring-zinc-200'
     }
 }
 
@@ -109,6 +122,9 @@ export default function VeiculosPage() {
     const [km, setKm] = useState('')
     const [purchasePrice, setPurchasePrice] = useState('')
     const [advertisedPrice, setAdvertisedPrice] = useState('')
+    const [chassi, setChassi] = useState('')
+    const [renavam, setRenavam] = useState('')
+    const [notes, setNotes] = useState('')
     const [status, setStatus] = useState('EM_ESTOQUE')
 
     const [loading, setLoading] = useState(false)
@@ -136,7 +152,9 @@ export default function VeiculosPage() {
             vehicle.plate.toLowerCase().includes(search.toLowerCase()) ||
             brandName.toLowerCase().includes(search.toLowerCase()) ||
             modelName.toLowerCase().includes(search.toLowerCase()) ||
-            colorName.toLowerCase().includes(search.toLowerCase())
+            colorName.toLowerCase().includes(search.toLowerCase()) ||
+            (vehicle.chassi || '').toLowerCase().includes(search.toLowerCase()) ||
+            (vehicle.renavam || '').toLowerCase().includes(search.toLowerCase())
 
         const matchesStatus = statusFilter ? vehicle.status === statusFilter : true
 
@@ -174,6 +192,9 @@ export default function VeiculosPage() {
         setKm('')
         setPurchasePrice('')
         setAdvertisedPrice('')
+        setChassi('')
+        setRenavam('')
+        setNotes('')
         setStatus('EM_ESTOQUE')
     }
 
@@ -240,27 +261,30 @@ export default function VeiculosPage() {
         const { data, error } = await supabase
             .from('vehicles')
             .select(`
-    id,
-    plate,
-    brand_id,
-    model_id,
-    engine_id,
-    transmission_id,
-    fuel_id,
-    color_id,
-    manufacture_year,
-    model_year,
-    km,
-    purchase_price,
-    advertised_price,
-    status,
-    brands(name),
-    vehicle_models(name),
-    engines(name),
-    transmissions(name),
-    fuels(name),
-    colors(name)
-  `)
+        id,
+        plate,
+        brand_id,
+        model_id,
+        engine_id,
+        transmission_id,
+        fuel_id,
+        color_id,
+        manufacture_year,
+        model_year,
+        km,
+        purchase_price,
+        advertised_price,
+        chassi,
+        renavam,
+        notes,
+        status,
+        brands(name),
+        vehicle_models(name),
+        engines(name),
+        transmissions(name),
+        fuels(name),
+        colors(name)
+      `)
             .order('created_at', { ascending: false })
 
         if (error) {
@@ -310,7 +334,26 @@ export default function VeiculosPage() {
             return
         }
 
+        if (chassi && chassi.length !== 17) {
+            showToast(
+                'error',
+                'Chassi inválido',
+                'O chassi deve possuir exatamente 17 caracteres.'
+            )
+            return
+        }
+
+        if (renavam && renavam.length !== 11) {
+            showToast(
+                'error',
+                'Renavam inválido',
+                'O Renavam deve possuir exatamente 11 dígitos.'
+            )
+            return
+        }
+
         setLoading(true)
+
         const vehicleData = {
             plate: plate.trim().toUpperCase(),
             brand_id: brandId,
@@ -324,8 +367,12 @@ export default function VeiculosPage() {
             km: km ? Number(km) : null,
             purchase_price: purchasePrice ? parseCurrency(purchasePrice) : 0,
             advertised_price: advertisedPrice ? parseCurrency(advertisedPrice) : 0,
+            chassi: chassi || null,
+            renavam: renavam || null,
+            notes: notes.trim() || null,
             status,
         }
+
         if (editingVehicleId) {
             const { error } = await supabase
                 .from('vehicles')
@@ -371,6 +418,9 @@ export default function VeiculosPage() {
         setKm(vehicle.km ? String(vehicle.km) : '')
         setPurchasePrice(formatCurrency(Number(vehicle.purchase_price || 0)))
         setAdvertisedPrice(formatCurrency(Number(vehicle.advertised_price || 0)))
+        setChassi(vehicle.chassi || '')
+        setRenavam(vehicle.renavam || '')
+        setNotes(vehicle.notes || '')
         setStatus(vehicle.status)
         setShowForm(true)
     }
@@ -425,8 +475,16 @@ export default function VeiculosPage() {
                                 <label className="text-sm font-medium text-zinc-700">Placa</label>
                                 <input
                                     value={plate}
-                                    onChange={(event) => setPlate(event.target.value)}
+                                    onChange={(event) =>
+                                        setPlate(
+                                            event.target.value
+                                                .toUpperCase()
+                                                .replace(/\s/g, '')
+                                                .slice(0, 7)
+                                        )
+                                    }
                                     placeholder="ABC1D23"
+                                    maxLength={7}
                                     className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
                                 />
                             </div>
@@ -570,6 +628,35 @@ export default function VeiculosPage() {
                             </div>
 
                             <div>
+                                <label className="text-sm font-medium text-zinc-700">Chassi</label>
+                                <input
+                                    value={chassi}
+                                    onChange={(event) => setChassi(formatChassi(event.target.value))}
+                                    placeholder="9BWZZZ377VT004251"
+                                    maxLength={17}
+                                    className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 uppercase outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                                />
+                                <p className="mt-1 text-xs text-zinc-400">
+                                    {chassi.length}/17 caracteres
+                                </p>
+                            </div>
+
+                            <div>
+                                <label className="text-sm font-medium text-zinc-700">Renavam</label>
+                                <input
+                                    value={renavam}
+                                    onChange={(event) => setRenavam(formatRenavam(event.target.value))}
+                                    placeholder="12345678901"
+                                    maxLength={11}
+                                    inputMode="numeric"
+                                    className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                                />
+                                <p className="mt-1 text-xs text-zinc-400">
+                                    {renavam.length}/11 dígitos
+                                </p>
+                            </div>
+
+                            <div>
                                 <label className="text-sm font-medium text-zinc-700">
                                     Valor de compra
                                 </label>
@@ -586,6 +673,7 @@ export default function VeiculosPage() {
                                     onChange={setAdvertisedPrice}
                                 />
                             </div>
+
                             <div>
                                 <label className="text-sm font-medium text-zinc-700">Status</label>
                                 <select
@@ -599,6 +687,19 @@ export default function VeiculosPage() {
                                         </option>
                                     ))}
                                 </select>
+                            </div>
+
+                            <div className="md:col-span-3">
+                                <label className="text-sm font-medium text-zinc-700">
+                                    Observações
+                                </label>
+                                <textarea
+                                    value={notes}
+                                    onChange={(event) => setNotes(event.target.value)}
+                                    placeholder="Ex: veículo revisado, manual e chave reserva, IPVA pago..."
+                                    rows={4}
+                                    className="mt-2 w-full resize-none rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                                />
                             </div>
                         </div>
 
@@ -625,7 +726,7 @@ export default function VeiculosPage() {
                         <input
                             value={search}
                             onChange={(event) => setSearch(event.target.value)}
-                            placeholder="Buscar por placa, marca, modelo ou cor..."
+                            placeholder="Buscar por placa, marca, modelo, cor, chassi ou renavam..."
                             className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
                         />
                     </div>
@@ -674,7 +775,6 @@ export default function VeiculosPage() {
                                     key={vehicle.id}
                                     className="border-t transition-colors duration-200 hover:bg-zinc-50"
                                 >
-
                                     <td className="px-5 py-4 font-semibold">{vehicle.plate}</td>
                                     <td className="px-5 py-4">{vehicle.brands?.name || '-'}</td>
                                     <td className="px-5 py-4">{vehicle.vehicle_models?.name || '-'}</td>
