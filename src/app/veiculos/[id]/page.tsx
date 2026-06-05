@@ -157,7 +157,7 @@ export default function VeiculoDetalhesPage() {
         fuels(name),
         vehicle_costs(amount, description, category),
         vehicle_sales(sale_price, sale_date, payment_method),
-        vehicle_files(
+        vehicle_files!vehicle_files_vehicle_id_fkey(
   id,
   vehicle_id,
   file_name,
