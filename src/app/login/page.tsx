@@ -22,15 +22,34 @@ export default function LoginPage() {
 
         setLoading(true)
 
-        const { error } = await supabase.auth.signInWithPassword({
+        const { data: loginData, error } = await supabase.auth.signInWithPassword({
             email,
             password,
         })
 
+        if (error || !loginData.user) {
+            setLoading(false)
+            setMessage('E-mail ou senha inválidos.')
+            return
+        }
+
+        const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('role, must_change_password')
+            .eq('id', loginData.user.id)
+            .single()
+
         setLoading(false)
 
-        if (error) {
-            setMessage('E-mail ou senha inválidos.')
+        if (profileError || !profile) {
+            setMessage('Não foi possível carregar seu perfil.')
+            return
+        }
+
+        localStorage.setItem('matrix_role', profile.role)
+
+        if (profile.must_change_password) {
+            router.push('/alterar-senha')
             return
         }
 

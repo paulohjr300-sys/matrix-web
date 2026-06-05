@@ -5,14 +5,15 @@ import { PageContainer } from '../../components/page-container'
 import { Toast } from '../../components/ui/toast'
 import { supabase } from '../../lib/supabase'
 import { UserPlus } from 'lucide-react'
+import { ConfirmDialog } from '../../components/ui/confirm-dialog'
 
 type Profile = {
     id: string
     name: string
     email: string
     role: 'ADMIN' | 'GERENTE' | 'VENDEDOR'
+    must_change_password?: boolean
 }
-
 export default function UsuariosPage() {
     const [users, setUsers] = useState<Profile[]>([])
     const [showForm, setShowForm] = useState(false)
@@ -21,7 +22,8 @@ export default function UsuariosPage() {
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [role, setRole] = useState<'ADMIN' | 'GERENTE' | 'VENDEDOR'>('VENDEDOR')
-
+    const [resetUser, setResetUser] = useState<Profile | null>(null)
+    const [resetLoading, setResetLoading] = useState(false)
     const [loading, setLoading] = useState(false)
 
     const [toast, setToast] = useState({
@@ -51,7 +53,7 @@ export default function UsuariosPage() {
     async function loadUsers() {
         const { data, error } = await supabase
             .from('profiles')
-            .select('id, name, email, role')
+            .select('id, name, email, role, must_change_password')
             .order('name')
 
         if (error) {
@@ -63,7 +65,9 @@ export default function UsuariosPage() {
     }
 
     useEffect(() => {
-        loadUsers()
+        queueMicrotask(() => {
+            void loadUsers()
+        })
     }, [])
 
     function resetForm() {
@@ -94,7 +98,10 @@ export default function UsuariosPage() {
             }),
         })
 
-        const result = await response.json()
+        const contentType = response.headers.get('content-type')
+        const result = contentType?.includes('application/json')
+            ? await response.json()
+            : { message: 'Rota de reset não encontrada ou retornou HTML.' }
 
         setLoading(false)
 
@@ -110,6 +117,50 @@ export default function UsuariosPage() {
         await loadUsers()
     }
 
+    async function handleResetPassword() {
+        if (!resetUser) return
+
+        setResetLoading(true)
+
+        try {
+            const response = await fetch('/api/users/reset-password', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    email: resetUser.email,
+                })
+            })
+            const contentType = response.headers.get('content-type')
+            const result = contentType?.includes('application/json')
+                ? await response.json()
+                : { message: 'Rota de reset não encontrada ou retornou HTML.' }
+
+            if (!response.ok) {
+                showToast('error', 'Erro ao redefinir senha', result.message)
+                return
+            }
+
+            showToast(
+                'success',
+                'E-mail enviado',
+                'O usuário recebeu um link para redefinir a senha.'
+            )
+            setResetUser(null)
+            await loadUsers()
+        } catch (error) {
+            console.error('Erro no reset de senha:', error)
+
+            showToast(
+                'error',
+                'Erro ao redefinir senha',
+                error instanceof Error ? error.message : 'Não foi possível concluir a redefinição.'
+            )
+        } finally {
+            setResetLoading(false)
+        }
+    }
     return (
         <>
             <PageContainer
@@ -206,6 +257,7 @@ export default function UsuariosPage() {
                                 <th className="px-5 py-4 text-left">Nome</th>
                                 <th className="px-5 py-4 text-left">E-mail</th>
                                 <th className="px-5 py-4 text-left">Perfil</th>
+                                <th className="px-5 py-4 text-right">Ações</th>
                             </tr>
                         </thead>
 
@@ -218,6 +270,21 @@ export default function UsuariosPage() {
                                         <span className="rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-600">
                                             {user.role}
                                         </span>
+
+                                        {user.must_change_password && (
+                                            <span className="ml-2 rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700">
+                                                Troca pendente
+                                            </span>
+                                        )}
+                                    </td>
+
+                                    <td className="px-5 py-4 text-right">
+                                        <button
+                                            onClick={() => setResetUser(user)}
+                                            className="rounded-xl bg-zinc-950 px-4 py-2 text-xs font-semibold text-white hover:bg-zinc-800"
+                                        >
+                                            Redefinir senha
+                                        </button>
                                     </td>
                                 </tr>
                             ))}
@@ -225,7 +292,7 @@ export default function UsuariosPage() {
                             {users.length === 0 && (
                                 <tr>
                                     <td
-                                        colSpan={3}
+                                        colSpan={4}
                                         className="px-5 py-10 text-center text-zinc-500"
                                     >
                                         Nenhum usuário cadastrado.
@@ -237,6 +304,20 @@ export default function UsuariosPage() {
                 </div>
             </PageContainer>
 
+            <ConfirmDialog
+                open={!!resetUser}
+                title="Redefinir senha"
+                description={
+                    resetUser
+                        ? `Deseja realmente redefinir a senha de ${resetUser.name}? Uma senha provisória será enviada para ${resetUser.email}.`
+                        : ''
+                }
+                confirmText="Redefinir senha"
+                loadingText="Redefinindo"
+                loading={resetLoading}
+                onCancel={() => setResetUser(null)}
+                onConfirm={handleResetPassword}
+            />
             <Toast
                 open={toast.open}
                 type={toast.type}

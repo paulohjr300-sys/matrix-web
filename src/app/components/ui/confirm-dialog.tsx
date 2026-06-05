@@ -9,6 +9,7 @@ interface ConfirmDialogProps {
     confirmText?: string
     cancelText?: string
     loading?: boolean
+    loadingText?: string
     onConfirm: () => void
     onCancel: () => void
 }
@@ -22,6 +23,7 @@ export function ConfirmDialog({
     loading = false,
     onConfirm,
     onCancel,
+    loadingText,
 }: ConfirmDialogProps) {
     if (!open) return null
 
@@ -62,7 +64,7 @@ export function ConfirmDialog({
                         disabled={loading}
                         className="rounded-xl bg-red-600 px-5 py-3 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
                     >
-                        {loading ? 'Excluindo...' : confirmText}
+                        {loading ? loadingText || 'Processando...' : confirmText}
                     </button>
                 </div>
             </div>
