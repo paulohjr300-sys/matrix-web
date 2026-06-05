@@ -7,7 +7,7 @@ import { CurrencyInput } from '../components/currency-input'
 import { Toast } from '../components/ui/toast'
 import { ConfirmDialog } from '../components/ui/confirm-dialog'
 import { supabase } from '../lib/supabase'
-import { Eye, Pencil, Trash2 } from 'lucide-react'
+import { Eye, FileText, ImageIcon, Pencil, Trash2, Upload } from 'lucide-react'
 
 type Brand = {
     id: string
@@ -23,6 +23,22 @@ type VehicleModel = {
 type SimpleOption = {
     id: string
     name: string
+}
+
+type VehicleFile = {
+    id: string
+    vehicle_id: string
+    file_name: string
+    file_path: string
+    file_type: 'IMAGE' | 'PDF'
+    file_size: number | null
+    mime_type: string | null
+}
+
+type PendingFile = {
+    localId: string
+    file: File
+    fileType: 'IMAGE' | 'PDF'
 }
 
 type Vehicle = {
@@ -69,12 +85,26 @@ function parseCurrency(value: string) {
     return Number(onlyNumbers) / 100
 }
 
+function createVehicleFilePath(vehicleId: string, fileName: string) {
+    return `${vehicleId}/${Date.now()}-${fileName}`
+}
+
 function formatChassi(value: string) {
     return value.toUpperCase().replace(/\s/g, '').slice(0, 17)
 }
 
 function formatRenavam(value: string) {
     return value.replace(/\D/g, '').slice(0, 11)
+}
+
+function formatFileSize(size?: number | null) {
+    if (!size) return '-'
+
+    if (size < 1024 * 1024) {
+        return `${(size / 1024).toFixed(1).replace('.', ',')} KB`
+    }
+
+    return `${(size / 1024 / 1024).toFixed(1).replace('.', ',')} MB`
 }
 
 function getStatusLabel(status: string) {
@@ -85,13 +115,10 @@ function getStatusClass(status: string) {
     switch (status) {
         case 'EM_ESTOQUE':
             return 'bg-blue-50 text-blue-700 ring-1 ring-blue-200'
-
         case 'RESERVADO':
             return 'bg-amber-50 text-amber-700 ring-1 ring-amber-200'
-
         case 'VENDIDO':
             return 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200'
-
         default:
             return 'bg-zinc-100 text-zinc-700 ring-1 ring-zinc-200'
     }
@@ -130,6 +157,12 @@ export default function VeiculosPage() {
     const [loading, setLoading] = useState(false)
     const [deleteVehicleId, setDeleteVehicleId] = useState<string | null>(null)
     const [deleteLoading, setDeleteLoading] = useState(false)
+
+    const [vehicleFiles, setVehicleFiles] = useState<VehicleFile[]>([])
+    const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([])
+    const [uploading, setUploading] = useState(false)
+    const [deleteFile, setDeleteFile] = useState<VehicleFile | null>(null)
+    const [deleteFileLoading, setDeleteFileLoading] = useState(false)
 
     const [search, setSearch] = useState('')
     const [statusFilter, setStatusFilter] = useState('')
@@ -196,6 +229,9 @@ export default function VeiculosPage() {
         setRenavam('')
         setNotes('')
         setStatus('EM_ESTOQUE')
+        setVehicleFiles([])
+        setPendingFiles([])
+        setDeleteFile(null)
     }
 
     async function loadBrands() {
@@ -313,6 +349,164 @@ export default function VeiculosPage() {
         setModelId('')
     }
 
+    function handleAddPendingFile(file: File, fileType: 'IMAGE' | 'PDF') {
+        if (fileType === 'PDF' && file.size > 10 * 1024 * 1024) {
+            showToast('error', 'Arquivo muito grande', 'O PDF deve ter no máximo 10MB.')
+            return
+        }
+
+        if (fileType === 'IMAGE' && file.size > 8 * 1024 * 1024) {
+            showToast('error', 'Imagem muito grande', 'A imagem deve ter no máximo 8MB.')
+            return
+        }
+
+        setPendingFiles((current) => [
+            ...current,
+            {
+                localId: `${Date.now()}-${Math.random()}`,
+                file,
+                fileType,
+            },
+        ])
+    }
+
+    async function compressImage(file: File): Promise<File> {
+        return new Promise((resolve, reject) => {
+            const image = new Image()
+            const reader = new FileReader()
+
+            reader.onload = () => {
+                image.src = String(reader.result)
+            }
+
+            image.onload = () => {
+                const canvas = document.createElement('canvas')
+                const maxWidth = 1280
+                const scale = Math.min(1, maxWidth / image.width)
+
+                canvas.width = Math.round(image.width * scale)
+                canvas.height = Math.round(image.height * scale)
+
+                const ctx = canvas.getContext('2d')
+
+                if (!ctx) {
+                    resolve(file)
+                    return
+                }
+
+                ctx.drawImage(image, 0, 0, canvas.width, canvas.height)
+
+                canvas.toBlob(
+                    (blob) => {
+                        if (!blob) {
+                            resolve(file)
+                            return
+                        }
+
+                        resolve(
+                            new File([blob], file.name.replace(/\.[^/.]+$/, '.webp'), {
+                                type: 'image/webp',
+                                lastModified: Date.now(),
+                            })
+                        )
+                    },
+                    'image/webp',
+                    0.75
+                )
+            }
+
+            image.onerror = reject
+            reader.onerror = reject
+            reader.readAsDataURL(file)
+        })
+    }
+
+    async function handleUploadFileToVehicle(
+        vehicleId: string,
+        file: File,
+        fileType: 'IMAGE' | 'PDF'
+    ) {
+        const bucket = fileType === 'IMAGE' ? 'vehicle-images' : 'vehicle-documents'
+        const finalFile = fileType === 'IMAGE' ? await compressImage(file) : file
+
+        const safeFileName = finalFile.name
+            .toLowerCase()
+            .replace(/\s/g, '-')
+            .replace(/[^a-z0-9.-]/g, '')
+
+        const filePath = createVehicleFilePath(vehicleId, safeFileName)
+
+        const { error: uploadError } = await supabase.storage
+            .from(bucket)
+            .upload(filePath, finalFile, {
+                cacheControl: '3600',
+                upsert: false,
+            })
+
+        if (uploadError) {
+            throw new Error(uploadError.message)
+        }
+
+        const { error: insertError } = await supabase.from('vehicle_files').insert({
+            vehicle_id: vehicleId,
+            file_name: finalFile.name,
+            file_path: filePath,
+            file_type: fileType,
+            file_size: finalFile.size,
+            mime_type: finalFile.type,
+        })
+
+        if (insertError) {
+            await supabase.storage.from(bucket).remove([filePath])
+            throw new Error(insertError.message)
+        }
+    }
+
+    async function uploadPendingFiles(vehicleId: string) {
+        if (pendingFiles.length === 0) return
+
+        setUploading(true)
+
+        try {
+            for (const item of pendingFiles) {
+                await handleUploadFileToVehicle(vehicleId, item.file, item.fileType)
+            }
+
+            setPendingFiles([])
+            await loadVehicleFiles(vehicleId)
+        } catch (error) {
+            showToast(
+                'error',
+                'Erro ao enviar arquivo',
+                error instanceof Error ? error.message : 'Não foi possível enviar o arquivo.'
+            )
+        } finally {
+            setUploading(false)
+        }
+    }
+
+    async function loadVehicleFiles(vehicleId: string) {
+        const { data, error } = await supabase
+            .from('vehicle_files')
+            .select('id, vehicle_id, file_name, file_path, file_type, file_size, mime_type')
+            .eq('vehicle_id', vehicleId)
+            .order('created_at', { ascending: false })
+
+        if (error) {
+            showToast('error', 'Erro', 'Não foi possível carregar os arquivos.')
+            return
+        }
+
+        setVehicleFiles((data || []) as VehicleFile[])
+    }
+
+    function getPublicFileUrl(file: VehicleFile) {
+        const bucket = file.file_type === 'IMAGE' ? 'vehicle-images' : 'vehicle-documents'
+        const { data } = supabase.storage.from(bucket).getPublicUrl(file.file_path)
+
+        return data.publicUrl
+    }
+
     async function handleSaveVehicle() {
         if (!plate.trim()) {
             showToast('error', 'Campo obrigatório', 'Informe a placa do veículo.')
@@ -385,14 +579,26 @@ export default function VeiculosPage() {
                 return
             }
 
+            if (pendingFiles.length > 0) {
+                await uploadPendingFiles(editingVehicleId)
+            }
+
             showToast('success', 'Veículo atualizado', 'O veículo foi atualizado com sucesso.')
         } else {
-            const { error } = await supabase.from('vehicles').insert(vehicleData)
+            const { data, error } = await supabase
+                .from('vehicles')
+                .insert(vehicleData)
+                .select('id')
+                .single()
 
             if (error) {
                 showToast('error', 'Erro ao cadastrar veículo', error.message)
                 setLoading(false)
                 return
+            }
+
+            if (data?.id && pendingFiles.length > 0) {
+                await uploadPendingFiles(data.id)
             }
 
             showToast('success', 'Veículo cadastrado', 'O veículo foi cadastrado com sucesso.')
@@ -422,7 +628,9 @@ export default function VeiculosPage() {
         setRenavam(vehicle.renavam || '')
         setNotes(vehicle.notes || '')
         setStatus(vehicle.status)
+        setPendingFiles([])
         setShowForm(true)
+        void loadVehicleFiles(vehicle.id)
     }
 
     async function handleDeleteVehicle() {
@@ -445,6 +653,35 @@ export default function VeiculosPage() {
         setDeleteVehicleId(null)
         setDeleteLoading(false)
         await loadVehicles()
+    }
+
+    async function handleDeleteFile() {
+        if (!deleteFile) return
+
+        setDeleteFileLoading(true)
+
+        const bucket = deleteFile.file_type === 'IMAGE' ? 'vehicle-images' : 'vehicle-documents'
+
+        await supabase.storage.from(bucket).remove([deleteFile.file_path])
+
+        const { error } = await supabase
+            .from('vehicle_files')
+            .delete()
+            .eq('id', deleteFile.id)
+
+        if (error) {
+            showToast('error', 'Erro', error.message)
+            setDeleteFileLoading(false)
+            return
+        }
+
+        showToast('success', 'Arquivo excluído', 'Arquivo removido com sucesso.')
+        setDeleteFile(null)
+        setDeleteFileLoading(false)
+
+        if (editingVehicleId) {
+            await loadVehicleFiles(editingVehicleId)
+        }
     }
 
     return (
@@ -667,7 +904,6 @@ export default function VeiculosPage() {
                                 <label className="text-sm font-medium text-zinc-700">
                                     Valor anunciado
                                 </label>
-
                                 <CurrencyInput
                                     value={advertisedPrice}
                                     onChange={setAdvertisedPrice}
@@ -703,12 +939,155 @@ export default function VeiculosPage() {
                             </div>
                         </div>
 
+                        <div className="mt-8 rounded-3xl border border-zinc-200 bg-zinc-50 p-5">
+                            <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+                                <div>
+                                    <h3 className="text-lg font-bold text-zinc-950">
+                                        Fotos e documentos
+                                    </h3>
+                                    <p className="mt-1 text-sm text-zinc-500">
+                                        Você pode anexar fotos e PDFs antes de salvar o veículo.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="mt-5 flex flex-wrap gap-3">
+                                <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-red-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-red-700">
+                                    <Upload size={18} />
+                                    Enviar foto
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        className="hidden"
+                                        disabled={uploading}
+                                        onChange={(event) => {
+                                            const file = event.target.files?.[0]
+                                            event.target.value = ''
+
+                                            if (file) {
+                                                handleAddPendingFile(file, 'IMAGE')
+                                            }
+                                        }}
+                                    />
+                                </label>
+
+                                <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-zinc-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-zinc-800">
+                                    <Upload size={18} />
+                                    Enviar PDF
+                                    <input
+                                        type="file"
+                                        accept="application/pdf"
+                                        className="hidden"
+                                        disabled={uploading}
+                                        onChange={(event) => {
+                                            const file = event.target.files?.[0]
+                                            event.target.value = ''
+
+                                            if (file) {
+                                                handleAddPendingFile(file, 'PDF')
+                                            }
+                                        }}
+                                    />
+                                </label>
+                            </div>
+
+                            <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+                                {pendingFiles.map((item) => (
+                                    <div
+                                        key={item.localId}
+                                        className="flex items-center justify-between gap-4 rounded-2xl border border-amber-200 bg-amber-50 p-4"
+                                    >
+                                        <div className="flex min-w-0 items-center gap-3">
+                                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-amber-700">
+                                                {item.fileType === 'IMAGE' ? (
+                                                    <ImageIcon size={20} />
+                                                ) : (
+                                                    <FileText size={20} />
+                                                )}
+                                            </div>
+
+                                            <div className="min-w-0">
+                                                <p className="truncate text-sm font-semibold text-zinc-950">
+                                                    {item.file.name}
+                                                </p>
+                                                <p className="text-xs text-amber-700">
+                                                    Aguardando salvar · {formatFileSize(item.file.size)}
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <button
+                                            onClick={() =>
+                                                setPendingFiles((current) =>
+                                                    current.filter((file) => file.localId !== item.localId)
+                                                )
+                                            }
+                                            className="rounded-xl bg-white p-2 text-red-600 transition hover:bg-red-50"
+                                        >
+                                            <Trash2 size={18} />
+                                        </button>
+                                    </div>
+                                ))}
+
+                                {vehicleFiles.map((file) => (
+                                    <div
+                                        key={file.id}
+                                        className="flex items-center justify-between gap-4 rounded-2xl border border-zinc-200 bg-white p-4"
+                                    >
+                                        <div className="flex min-w-0 items-center gap-3">
+                                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-zinc-100 text-zinc-700">
+                                                {file.file_type === 'IMAGE' ? (
+                                                    <ImageIcon size={20} />
+                                                ) : (
+                                                    <FileText size={20} />
+                                                )}
+                                            </div>
+
+                                            <div className="min-w-0">
+                                                <p className="truncate text-sm font-semibold text-zinc-950">
+                                                    {file.file_name}
+                                                </p>
+                                                <p className="text-xs text-zinc-500">
+                                                    {file.file_type === 'IMAGE' ? 'Foto' : 'PDF'} ·{' '}
+                                                    {formatFileSize(file.file_size)}
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex shrink-0 gap-2">
+                                            <a
+                                                href={getPublicFileUrl(file)}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="rounded-xl bg-zinc-100 px-3 py-2 text-xs font-bold text-zinc-700 transition hover:bg-zinc-200"
+                                            >
+                                                Abrir
+                                            </a>
+
+                                            <button
+                                                onClick={() => setDeleteFile(file)}
+                                                className="rounded-xl bg-red-50 p-2 text-red-600 transition hover:bg-red-100"
+                                            >
+                                                <Trash2 size={18} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+
+                                {pendingFiles.length === 0 && vehicleFiles.length === 0 && (
+                                    <div className="rounded-2xl bg-white p-6 text-center text-sm text-zinc-500 md:col-span-2">
+                                        Nenhum arquivo anexado para este veículo.
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
                         <button
                             onClick={handleSaveVehicle}
-                            disabled={loading}
+                            disabled={loading || uploading}
                             className="mt-6 rounded-xl bg-zinc-950 px-6 py-3 text-sm font-semibold text-white transition-all duration-300 hover:-translate-y-0.5 hover:bg-zinc-800 disabled:opacity-50"
                         >
-                            {loading
+                            {loading || uploading
                                 ? 'Salvando...'
                                 : editingVehicleId
                                     ? 'Salvar edição'
@@ -856,6 +1235,16 @@ export default function VeiculosPage() {
                 loading={deleteLoading}
                 onCancel={() => setDeleteVehicleId(null)}
                 onConfirm={handleDeleteVehicle}
+            />
+
+            <ConfirmDialog
+                open={!!deleteFile}
+                title="Excluir arquivo"
+                description="Deseja realmente excluir este arquivo?"
+                confirmText="Excluir arquivo"
+                loading={deleteFileLoading}
+                onCancel={() => setDeleteFile(null)}
+                onConfirm={handleDeleteFile}
             />
 
             <Toast

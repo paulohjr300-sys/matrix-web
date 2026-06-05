@@ -11,8 +11,8 @@ import { Pencil, Trash2 } from 'lucide-react'
 type Vehicle = {
     id: string
     plate: string
-    brands?: { name: string }[] | null
-    vehicle_models?: { name: string }[] | null
+    brands?: { name: string } | null
+    vehicle_models?: { name: string } | null
 }
 
 type Sale = {
@@ -48,10 +48,7 @@ function parseCurrency(value: string) {
 function getVehicleLabel(vehicle?: Vehicle | null) {
     if (!vehicle) return '-'
 
-    const brandName = vehicle.brands?.[0]?.name || ''
-    const modelName = vehicle.vehicle_models?.[0]?.name || ''
-
-    return `${vehicle.plate} - ${brandName} ${modelName}`.trim()
+    return `${vehicle.plate} - ${vehicle.brands?.name || ''} ${vehicle.vehicle_models?.name || ''}`
 }
 
 export default function VendasPage() {
@@ -115,7 +112,7 @@ export default function VendasPage() {
             .neq('status', 'VENDIDO')
             .order('plate')
 
-        setVehicles((data || []) as Vehicle[])
+        setVehicles((data || []) as unknown as Vehicle[])
     }
 
     async function loadSales() {

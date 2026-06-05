@@ -22,8 +22,8 @@ type VehicleDashboard = {
   advertised_price: number
   status: string
   created_at: string
-  brands?: { name: string }[] | null
-  vehicle_models?: { name: string }[] | null
+  brands?: { name: string } | null
+  vehicle_models?: { name: string } | null
   vehicle_costs?: { amount: number }[]
   vehicle_sales?: { sale_price: number; sale_date: string }[]
 }
@@ -36,10 +36,10 @@ function formatCurrency(value: number) {
 }
 
 function getVehicleName(vehicle: VehicleDashboard) {
-  const brandName = vehicle.brands?.[0]?.name || ''
-  const modelName = vehicle.vehicle_models?.[0]?.name || ''
+  const brandName = vehicle.brands?.name || ''
+  const modelName = vehicle.vehicle_models?.name || ''
 
-  return `${vehicle.plate} - ${brandName} ${modelName}`
+  return `${brandName} - ${modelName}`.trim() || '-'
 }
 
 function getNumbers(vehicle: VehicleDashboard) {
@@ -131,8 +131,9 @@ export default function DashboardPage() {
           vehicle_sales(sale_price, sale_date)
         `)
         .order('created_at', { ascending: false })
+        .limit(5)
 
-      setVehicles((data || []) as VehicleDashboard[])
+      setVehicles((data || []) as unknown as VehicleDashboard[])
     }
 
     loadDashboard()
@@ -427,7 +428,7 @@ export default function DashboardPage() {
 
       <div className="mt-8 overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-xl shadow-zinc-200/50">
         <div className="border-b border-zinc-200 p-6">
-          <h2 className="text-xl font-bold">Últimos veículos cadastrados</h2>
+          <h2 className="text-xl font-bold">Últimos 5 veículos cadastrados</h2>
           <p className="mt-1 text-sm text-zinc-500">
             Acompanhe os veículos adicionados recentemente.
           </p>
@@ -475,7 +476,7 @@ export default function DashboardPage() {
 
                 <td className="px-5 py-4 text-right">
                   <Link
-                    href="/dre"
+                    href={`/dre?vehicleId=${vehicle.id}`}
                     className="text-sm font-semibold text-red-600 hover:text-red-700"
                   >
                     Ver DRE

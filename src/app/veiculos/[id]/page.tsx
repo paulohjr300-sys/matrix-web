@@ -3,11 +3,30 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
-import { ArrowLeft, Car, DollarSign, FileText, TrendingUp } from 'lucide-react'
+import {
+    ArrowLeft,
+    Car,
+    DollarSign,
+    ExternalLink,
+    FileText,
+    ImageIcon,
+    TrendingUp,
+} from 'lucide-react'
 import { PageContainer } from '../../components/page-container'
 import { supabase } from '../../lib/supabase'
 import { Toast } from '../../components/ui/toast'
 
+
+
+type VehicleFile = {
+    id: string
+    vehicle_id: string
+    file_name: string
+    file_path: string
+    file_type: 'IMAGE' | 'PDF'
+    file_size: number | null
+    mime_type: string | null
+}
 type Vehicle = {
     id: string
     plate: string
@@ -28,6 +47,7 @@ type Vehicle = {
     fuels?: { name: string } | null
     vehicle_costs?: { amount: number; description: string; category: string | null }[]
     vehicle_sales?: { sale_price: number; sale_date: string; payment_method: string | null }[]
+    vehicle_files?: VehicleFile[]
 }
 
 function formatCurrency(value: number) {
@@ -37,6 +57,23 @@ function formatCurrency(value: number) {
     })
 }
 
+function formatFileSize(size?: number | null) {
+    if (!size) return '-'
+
+    if (size < 1024 * 1024) {
+        return `${(size / 1024).toFixed(1).replace('.', ',')} KB`
+    }
+
+    return `${(size / 1024 / 1024).toFixed(1).replace('.', ',')} MB`
+}
+
+function getPublicFileUrl(file: VehicleFile) {
+    const bucket = file.file_type === 'IMAGE' ? 'vehicle-images' : 'vehicle-documents'
+
+    const { data } = supabase.storage.from(bucket).getPublicUrl(file.file_path)
+
+    return data.publicUrl
+}
 function getStatusLabel(status: string) {
     switch (status) {
         case 'EM_ESTOQUE':
@@ -68,6 +105,7 @@ export default function VeiculoDetalhesPage() {
     const vehicleId = String(params.id)
 
     const [vehicle, setVehicle] = useState<Vehicle | null>(null)
+    const [loading, setLoading] = useState(true)
 
     const [toast, setToast] = useState({
         open: false,
@@ -75,6 +113,8 @@ export default function VeiculoDetalhesPage() {
         title: '',
         description: '',
     })
+
+
 
     function showToast(type: 'success' | 'error', title: string, description?: string) {
         setToast({
@@ -89,10 +129,15 @@ export default function VeiculoDetalhesPage() {
         }, 3000)
     }
 
-    async function loadVehicle() {
-        const { data, error } = await supabase
-            .from('vehicles')
-            .select(`
+    useEffect(() => {
+        let mounted = true
+
+        async function fetchVehicle() {
+            setLoading(true)
+
+            const { data, error } = await supabase
+                .from('vehicles')
+                .select(`
         id,
         plate,
         chassi,
@@ -111,27 +156,42 @@ export default function VeiculoDetalhesPage() {
         transmissions(name),
         fuels(name),
         vehicle_costs(amount, description, category),
-        vehicle_sales(sale_price, sale_date, payment_method)
+        vehicle_sales(sale_price, sale_date, payment_method),
+        vehicle_files(
+  id,
+  vehicle_id,
+  file_name,
+  file_path,
+  file_type,
+  file_size,
+  mime_type
+)
       `)
-            .eq('id', vehicleId)
-            .single()
+                .eq('id', vehicleId)
+                .single()
 
-        if (error) {
-            showToast('error', 'Erro', error.message)
-            return
+            if (!mounted) {
+                return
+            }
+
+            if (error) {
+                showToast('error', 'Erro ao carregar veículo', error.message)
+                setLoading(false)
+                return
+            }
+
+            setVehicle(data as unknown as Vehicle)
+            setLoading(false)
         }
 
-        setVehicle(data as unknown as Vehicle)
-    }
+        void fetchVehicle()
 
-    useEffect(() => {
-        const fetchData = async () => {
-            await loadVehicle()
+        return () => {
+            mounted = false
         }
-
-        fetchData()
     }, [vehicleId])
-    if (!vehicle) {
+
+    if (loading) {
         return (
             <PageContainer title="Veículo" description="Carregando informações...">
                 <div className="rounded-3xl bg-white p-10 text-center text-zinc-500">
@@ -141,6 +201,31 @@ export default function VeiculoDetalhesPage() {
         )
     }
 
+    if (!vehicle) {
+        return (
+            <PageContainer title="Veículo" description="Não encontrado">
+                <Link
+                    href="/veiculos"
+                    className="mb-6 inline-flex items-center gap-2 text-sm font-semibold text-zinc-500 transition hover:text-red-600"
+                >
+                    <ArrowLeft size={18} />
+                    Voltar para veículos
+                </Link>
+
+                <div className="rounded-3xl bg-white p-10 text-center text-zinc-500">
+                    Veículo não encontrado.
+                </div>
+            </PageContainer>
+        )
+    }
+
+    const images = (vehicle.vehicle_files || []).filter(
+        (file) => file.file_type === 'IMAGE'
+    )
+
+    const documents = (vehicle.vehicle_files || []).filter(
+        (file) => file.file_type === 'PDF'
+    )
     const totalCosts = (vehicle.vehicle_costs || []).reduce(
         (sum, cost) => sum + Number(cost.amount || 0),
         0
@@ -173,6 +258,7 @@ export default function VeiculoDetalhesPage() {
                     <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-xl shadow-zinc-200/50">
                         <Car className="text-blue-600" />
                         <p className="mt-4 text-sm text-zinc-500">Status</p>
+
                         <span
                             className={`mt-2 inline-flex rounded-full border px-3 py-1 text-xs font-bold ${getStatusClass(
                                 vehicle.status
@@ -201,12 +287,14 @@ export default function VeiculoDetalhesPage() {
                     <div className="rounded-3xl border border-zinc-200 bg-zinc-950 p-6 text-white shadow-xl shadow-zinc-300/60">
                         <FileText className={profit >= 0 ? 'text-emerald-300' : 'text-red-300'} />
                         <p className="mt-4 text-sm text-zinc-400">Resultado</p>
+
                         <strong
                             className={`mt-2 block text-2xl ${profit >= 0 ? 'text-emerald-300' : 'text-red-300'
                                 }`}
                         >
                             {formatCurrency(profit)}
                         </strong>
+
                         <p className="mt-1 text-xs text-zinc-400">
                             Margem: {margin.toFixed(2).replace('.', ',')}%
                         </p>
@@ -262,6 +350,85 @@ export default function VeiculoDetalhesPage() {
                     </div>
                 </div>
 
+                <div className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-2">
+                    <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-xl shadow-zinc-200/50">
+                        <h2 className="text-xl font-bold">Fotos do veículo</h2>
+                        <p className="mt-1 text-sm text-zinc-500">
+                            Fotos cadastradas no veículo.
+                        </p>
+
+                        <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+                            {images.map((file) => (
+                                <a
+                                    key={file.id}
+                                    href={getPublicFileUrl(file)}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-50 transition hover:-translate-y-0.5 hover:shadow-lg"
+                                >
+                                    <img
+                                        src={getPublicFileUrl(file)}
+                                        alt={file.file_name}
+                                        className="h-48 w-full object-cover"
+                                    />
+
+                                    <div className="p-4">
+                                        <p className="truncate text-sm font-semibold text-zinc-950">
+                                            {file.file_name}
+                                        </p>
+                                        <p className="text-xs text-zinc-500">
+                                            {formatFileSize(file.file_size)}
+                                        </p>
+                                    </div>
+                                </a>
+                            ))}
+
+                            {images.length === 0 && (
+                                <div className="rounded-2xl bg-zinc-50 p-8 text-center text-sm text-zinc-500 md:col-span-2">
+                                    <ImageIcon className="mx-auto mb-3 text-zinc-400" />
+                                    Nenhuma foto cadastrada.
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-xl shadow-zinc-200/50">
+                        <h2 className="text-xl font-bold">Documentos PDF</h2>
+                        <p className="mt-1 text-sm text-zinc-500">
+                            Documentos cadastrados no veículo.
+                        </p>
+
+                        <div className="mt-6 space-y-3">
+                            {documents.map((file) => (
+                                <a
+                                    key={file.id}
+                                    href={getPublicFileUrl(file)}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="flex items-center justify-between gap-4 rounded-2xl border border-zinc-200 p-4 transition hover:bg-zinc-50"
+                                >
+                                    <div className="min-w-0">
+                                        <p className="truncate text-sm font-semibold text-zinc-950">
+                                            {file.file_name}
+                                        </p>
+                                        <p className="text-xs text-zinc-500">
+                                            {formatFileSize(file.file_size)}
+                                        </p>
+                                    </div>
+
+                                    <ExternalLink size={18} className="shrink-0 text-zinc-500" />
+                                </a>
+                            ))}
+
+                            {documents.length === 0 && (
+                                <div className="rounded-2xl bg-zinc-50 p-8 text-center text-sm text-zinc-500">
+                                    <FileText className="mx-auto mb-3 text-zinc-400" />
+                                    Nenhum documento cadastrado.
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
                 <div className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-2">
                     <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-xl shadow-zinc-200/50">
                         <h2 className="text-xl font-bold">Custos lançados</h2>

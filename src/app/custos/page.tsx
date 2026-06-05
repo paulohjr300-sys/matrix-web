@@ -71,7 +71,7 @@ function getVehicleLabel(vehicle?: Vehicle | Vehicle[] | null) {
     ? currentVehicle.vehicle_models[0]?.name || ''
     : currentVehicle.vehicle_models?.name || ''
 
-  return `${currentVehicle.plate} - ${brand} ${model}`.trim()
+  return `${currentVehicle.plate} - ${brand} - ${model}`.trim()
 }
 
 export default function CustosPage() {

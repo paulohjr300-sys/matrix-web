@@ -12,6 +12,7 @@ import {
     ChevronDown,
     ChevronUp,
 } from 'lucide-react'
+import { useSearchParams } from 'next/navigation'
 
 type VehicleDre = {
     id: string
@@ -19,8 +20,8 @@ type VehicleDre = {
     purchase_price: number
     advertised_price: number
     status: string
-    brands?: { name: string }[] | null
-    vehicle_models?: { name: string }[] | null
+    brands?: { name: string } | null
+    vehicle_models?: { name: string } | null
     vehicle_costs?: {
         amount: number
     }[]
@@ -41,11 +42,11 @@ function formatPercent(value: number) {
 }
 
 function getVehicleName(vehicle: VehicleDre) {
-    const brandName = vehicle.brands?.[0]?.name || ''
-    const modelName = vehicle.vehicle_models?.[0]?.name || ''
+    const brandName = vehicle.brands?.name || ''
+    const modelName = vehicle.vehicle_models?.name || ''
     const details = [brandName, modelName].filter(Boolean).join(' ')
 
-    return `${vehicle.plate}${details ? ` - ${details}` : ''}`
+    return `${vehicle.plate} - ${brandName}`
 }
 
 function getStatusBadge(status: string) {
@@ -112,14 +113,18 @@ function getStatusLabel(status: string) {
 export default function DrePage() {
     const [vehicles, setVehicles] = useState<VehicleDre[]>([])
     const [search, setSearch] = useState('')
-    const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null)
-
+    const searchParams = useSearchParams()
+    const vehicleIdFromUrl = searchParams.get('vehicleId')
+    const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(vehicleIdFromUrl)
     const [toast, setToast] = useState({
         open: false,
         type: 'success' as 'success' | 'error',
         title: '',
         description: '',
     })
+
+    // Initialize selectedVehicleId from URL param via useState above.
+    // Avoid setting state synchronously inside an effect to prevent cascading renders.
 
     function showToast(
         type: 'success' | 'error',
@@ -137,6 +142,8 @@ export default function DrePage() {
             setToast((current) => ({ ...current, open: false }))
         }, 3000)
     }
+
+
 
     useEffect(() => {
         let isMounted = true
@@ -166,7 +173,7 @@ export default function DrePage() {
                 return
             }
 
-            setVehicles((data || []) as VehicleDre[])
+            setVehicles((data || []) as unknown as VehicleDre[])
         }
 
         loadDre()
@@ -231,6 +238,7 @@ export default function DrePage() {
             profit: 0,
         }
     )
+
 
     return (
         <>
