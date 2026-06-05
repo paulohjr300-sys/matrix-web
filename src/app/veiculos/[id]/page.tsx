@@ -125,9 +125,12 @@ export default function VeiculoDetalhesPage() {
     }
 
     useEffect(() => {
-        void loadVehicle()
-    }, [vehicleId])
+        const fetchData = async () => {
+            await loadVehicle()
+        }
 
+        fetchData()
+    }, [vehicleId])
     if (!vehicle) {
         return (
             <PageContainer title="Veículo" description="Carregando informações...">
