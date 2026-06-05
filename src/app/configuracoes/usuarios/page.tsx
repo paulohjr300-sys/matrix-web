@@ -13,7 +13,9 @@ type Profile = {
     email: string
     role: 'ADMIN' | 'GERENTE' | 'VENDEDOR'
     must_change_password?: boolean
+    is_active?: boolean
 }
+
 export default function UsuariosPage() {
     const [users, setUsers] = useState<Profile[]>([])
     const [showForm, setShowForm] = useState(false)
@@ -22,8 +24,13 @@ export default function UsuariosPage() {
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [role, setRole] = useState<'ADMIN' | 'GERENTE' | 'VENDEDOR'>('VENDEDOR')
+
     const [resetUser, setResetUser] = useState<Profile | null>(null)
     const [resetLoading, setResetLoading] = useState(false)
+
+    const [statusUser, setStatusUser] = useState<Profile | null>(null)
+    const [statusLoading, setStatusLoading] = useState(false)
+
     const [loading, setLoading] = useState(false)
 
     const [toast, setToast] = useState({
@@ -53,7 +60,7 @@ export default function UsuariosPage() {
     async function loadUsers() {
         const { data, error } = await supabase
             .from('profiles')
-            .select('id, name, email, role, must_change_password')
+            .select('id, name, email, role, must_change_password, is_active')
             .order('name')
 
         if (error) {
@@ -101,7 +108,7 @@ export default function UsuariosPage() {
         const contentType = response.headers.get('content-type')
         const result = contentType?.includes('application/json')
             ? await response.json()
-            : { message: 'Rota de reset não encontrada ou retornou HTML.' }
+            : { message: 'Rota não encontrada ou retornou HTML.' }
 
         setLoading(false)
 
@@ -132,7 +139,7 @@ export default function UsuariosPage() {
                     email: resetUser.email,
                 }),
             })
-            
+
             const contentType = response.headers.get('content-type')
             const result = contentType?.includes('application/json')
                 ? await response.json()
@@ -146,8 +153,9 @@ export default function UsuariosPage() {
             showToast(
                 'success',
                 'E-mail enviado',
-                'O usuário recebeu um link para redefinir a senha.'
+                'O usuário recebeu um link para criar uma nova senha.'
             )
+
             setResetUser(null)
             await loadUsers()
         } catch (error) {
@@ -156,12 +164,65 @@ export default function UsuariosPage() {
             showToast(
                 'error',
                 'Erro ao redefinir senha',
-                error instanceof Error ? error.message : 'Não foi possível concluir a redefinição.'
+                error instanceof Error
+                    ? error.message
+                    : 'Não foi possível concluir a redefinição.'
             )
         } finally {
             setResetLoading(false)
         }
     }
+
+    async function handleToggleStatus() {
+        if (!statusUser) return
+
+        setStatusLoading(true)
+
+        try {
+            const response = await fetch('/api/users/toggle-status', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    userId: statusUser.id,
+                    isActive: statusUser.is_active !== false,
+                }),
+            })
+
+            const contentType = response.headers.get('content-type')
+            const result = contentType?.includes('application/json')
+                ? await response.json()
+                : { message: 'Rota não encontrada ou retornou HTML.' }
+
+            if (!response.ok) {
+                showToast('error', 'Erro', result.message)
+                return
+            }
+
+            showToast(
+                'success',
+                'Sucesso',
+                statusUser.is_active !== false
+                    ? 'Usuário desativado com sucesso.'
+                    : 'Usuário ativado com sucesso.'
+            )
+
+            setStatusUser(null)
+            await loadUsers()
+        } catch (error) {
+            console.error('Erro ao alterar status:', error)
+
+            showToast(
+                'error',
+                'Erro',
+                'Não foi possível alterar o status do usuário.'
+            )
+        } finally {
+            setStatusLoading(false)
+        }
+    }
+
     return (
         <>
             <PageContainer
@@ -212,7 +273,7 @@ export default function UsuariosPage() {
 
                             <div>
                                 <label className="text-sm font-medium text-zinc-700">
-                                    Senha provisória
+                                    Senha inicial
                                 </label>
                                 <input
                                     type="password"
@@ -264,9 +325,15 @@ export default function UsuariosPage() {
 
                         <tbody>
                             {users.map((user) => (
-                                <tr key={user.id} className="border-t hover:bg-zinc-50">
+                                <tr
+                                    key={user.id}
+                                    className={`border-t hover:bg-zinc-50 ${user.is_active === false ? 'bg-zinc-50 opacity-70' : ''
+                                        }`}
+                                >
                                     <td className="px-5 py-4 font-semibold">{user.name}</td>
+
                                     <td className="px-5 py-4">{user.email}</td>
+
                                     <td className="px-5 py-4">
                                         <span className="rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-600">
                                             {user.role}
@@ -277,15 +344,34 @@ export default function UsuariosPage() {
                                                 Troca pendente
                                             </span>
                                         )}
+
+                                        {user.is_active === false && (
+                                            <span className="ml-2 rounded-full bg-zinc-200 px-3 py-1 text-xs font-bold text-zinc-700">
+                                                Inativo
+                                            </span>
+                                        )}
                                     </td>
 
                                     <td className="px-5 py-4 text-right">
-                                        <button
-                                            onClick={() => setResetUser(user)}
-                                            className="rounded-xl bg-zinc-950 px-4 py-2 text-xs font-semibold text-white hover:bg-zinc-800"
-                                        >
-                                            Redefinir senha
-                                        </button>
+                                        <div className="flex justify-end gap-2">
+                                            <button
+                                                onClick={() => setResetUser(user)}
+                                                disabled={user.is_active === false}
+                                                className="rounded-xl bg-zinc-950 px-4 py-2 text-xs font-semibold text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40"
+                                            >
+                                                Redefinir senha
+                                            </button>
+
+                                            <button
+                                                onClick={() => setStatusUser(user)}
+                                                className={`rounded-xl px-4 py-2 text-xs font-semibold text-white ${user.is_active === false
+                                                        ? 'bg-green-600 hover:bg-green-700'
+                                                        : 'bg-amber-600 hover:bg-amber-700'
+                                                    }`}
+                                            >
+                                                {user.is_active === false ? 'Ativar' : 'Desativar'}
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             ))}
@@ -310,15 +396,37 @@ export default function UsuariosPage() {
                 title="Redefinir senha"
                 description={
                     resetUser
-                        ? `Deseja realmente redefinir a senha de ${resetUser.name}? Uma senha provisória será enviada para ${resetUser.email}.`
+                        ? `Deseja realmente enviar um e-mail de redefinição de senha para ${resetUser.name}? O link será enviado para ${resetUser.email}.`
                         : ''
                 }
-                confirmText="Redefinir senha"
-                loadingText="Redefinindo"
+                confirmText="Enviar e-mail"
+                loadingText="Enviando"
                 loading={resetLoading}
                 onCancel={() => setResetUser(null)}
                 onConfirm={handleResetPassword}
             />
+
+            <ConfirmDialog
+                open={!!statusUser}
+                title={
+                    statusUser?.is_active === false
+                        ? 'Ativar usuário'
+                        : 'Desativar usuário'
+                }
+                description={
+                    statusUser
+                        ? statusUser.is_active === false
+                            ? `Deseja realmente ativar ${statusUser.name}? Ele poderá acessar o sistema novamente.`
+                            : `Deseja realmente desativar ${statusUser.name}? Ele não poderá mais acessar o sistema.`
+                        : ''
+                }
+                confirmText={statusUser?.is_active === false ? 'Ativar' : 'Desativar'}
+                loadingText="Processando"
+                loading={statusLoading}
+                onCancel={() => setStatusUser(null)}
+                onConfirm={handleToggleStatus}
+            />
+
             <Toast
                 open={toast.open}
                 type={toast.type}
