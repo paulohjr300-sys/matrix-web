@@ -7,6 +7,7 @@ import { Toast } from '../components/ui/toast'
 import { ConfirmDialog } from '../components/ui/confirm-dialog'
 import { supabase } from '../lib/supabase'
 import { Eye, Pencil, Trash2 } from 'lucide-react'
+import Link from 'next/link'
 
 type Brand = {
     id: string
@@ -39,12 +40,12 @@ type Vehicle = {
     purchase_price: number
     advertised_price: number
     status: string
-    brands?: { name: string }[] | null
-    vehicle_models?: { name: string }[] | null
-    engines?: { name: string }[] | null
-    transmissions?: { name: string }[] | null
-    fuels?: { name: string }[] | null
-    colors?: { name: string }[] | null
+    brands?: { name: string } | null
+    vehicle_models?: { name: string } | null
+    engines?: { name: string } | null
+    transmissions?: { name: string } | null
+    fuels?: { name: string } | null
+    colors?: { name: string } | null
 
 }
 
@@ -127,9 +128,9 @@ export default function VeiculosPage() {
     const filteredModels = models.filter((model) => model.brand_id === brandId)
 
     const filteredVehicles = vehicles.filter((vehicle) => {
-        const brandName = vehicle.brands?.[0]?.name || ''
-        const modelName = vehicle.vehicle_models?.[0]?.name || ''
-        const colorName = vehicle.colors?.[0]?.name || ''
+        const brandName = vehicle.brands?.name || ''
+        const modelName = vehicle.vehicle_models?.name || ''
+        const colorName = vehicle.colors?.name || ''
 
         const matchesSearch =
             vehicle.plate.toLowerCase().includes(search.toLowerCase()) ||
@@ -239,27 +240,27 @@ export default function VeiculosPage() {
         const { data, error } = await supabase
             .from('vehicles')
             .select(`
-        id,
-        plate,
-        brand_id,
-        model_id,
-        engine_id,
-        transmission_id,
-        fuel_id,
-        color_id,
-        manufacture_year,
-        model_year,
-        km,
-        purchase_price,
-        advertised_price,
-        status,
-        brands(name),
-        vehicle_models(name),
-        engines(name),
-        transmissions(name),
-        fuels(name),
-        colors(name)
-      `)
+    id,
+    plate,
+    brand_id,
+    model_id,
+    engine_id,
+    transmission_id,
+    fuel_id,
+    color_id,
+    manufacture_year,
+    model_year,
+    km,
+    purchase_price,
+    advertised_price,
+    status,
+    brands(name),
+    vehicle_models(name),
+    engines(name),
+    transmissions(name),
+    fuels(name),
+    colors(name)
+  `)
             .order('created_at', { ascending: false })
 
         if (error) {
@@ -310,7 +311,6 @@ export default function VeiculosPage() {
         }
 
         setLoading(true)
-
         const vehicleData = {
             plate: plate.trim().toUpperCase(),
             brand_id: brandId,
@@ -326,7 +326,6 @@ export default function VeiculosPage() {
             advertised_price: advertisedPrice ? parseCurrency(advertisedPrice) : 0,
             status,
         }
-
         if (editingVehicleId) {
             const { error } = await supabase
                 .from('vehicles')
@@ -677,11 +676,11 @@ export default function VeiculosPage() {
                                 >
 
                                     <td className="px-5 py-4 font-semibold">{vehicle.plate}</td>
-                                    <td className="px-5 py-4">{vehicle.brands?.[0]?.name || '-'}</td>
-                                    <td className="px-5 py-4">{vehicle.vehicle_models?.[0]?.name || '-'}</td>
-                                    <td className="px-5 py-4">{vehicle.colors?.[0]?.name || '-'}</td>
-                                    <td className="px-5 py-4">{vehicle.engines?.[0]?.name || '-'}</td>
-                                    <td className="px-5 py-4">{vehicle.transmissions?.[0]?.name || '-'}</td>
+                                    <td className="px-5 py-4">{vehicle.brands?.name || '-'}</td>
+                                    <td className="px-5 py-4">{vehicle.vehicle_models?.name || '-'}</td>
+                                    <td className="px-5 py-4">{vehicle.colors?.name || '-'}</td>
+                                    <td className="px-5 py-4">{vehicle.engines?.name || '-'}</td>
+                                    <td className="px-5 py-4">{vehicle.transmissions?.name || '-'}</td>
                                     <td className="px-5 py-4">
                                         {vehicle.manufacture_year || '-'}
                                         {vehicle.model_year ? `/${vehicle.model_year}` : ''}
@@ -706,12 +705,13 @@ export default function VeiculosPage() {
                                     </td>
                                     <td className="px-5 py-4">
                                         <div className="flex justify-end gap-2">
-                                            <button
+                                            <Link
+                                                href={`/veiculos/${vehicle.id}`}
                                                 className="rounded-xl bg-zinc-100 p-2 text-zinc-700 transition hover:bg-zinc-200"
                                                 title="Visualizar"
                                             >
                                                 <Eye size={18} />
-                                            </button>
+                                            </Link>
 
                                             <button
                                                 onClick={() => handleEditVehicle(vehicle)}
