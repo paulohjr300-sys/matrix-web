@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { PageContainer } from '../../components/page-container'
 import { Toast } from '../../components/ui/toast'
-import { supabase } from '../../lib/supabase'
+import { supabase } from '../../../lib/supabase'
 import { UserPlus } from 'lucide-react'
 import { ConfirmDialog } from '../../components/ui/confirm-dialog'
 
@@ -130,8 +130,9 @@ export default function UsuariosPage() {
                 },
                 body: JSON.stringify({
                     email: resetUser.email,
-                })
+                }),
             })
+            
             const contentType = response.headers.get('content-type')
             const result = contentType?.includes('application/json')
                 ? await response.json()

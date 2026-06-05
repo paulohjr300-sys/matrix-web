@@ -13,7 +13,7 @@ import {
     TrendingUp,
 } from 'lucide-react'
 import { PageContainer } from '../../components/page-container'
-import { supabase } from '../../lib/supabase'
+import { supabase } from '../../../lib/supabase'
 import { Toast } from '../../components/ui/toast'
 
 

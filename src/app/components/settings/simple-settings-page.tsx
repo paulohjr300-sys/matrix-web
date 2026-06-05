@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { ArrowLeft, Pencil, Trash2 } from 'lucide-react'
 
 import { PageContainer } from '../../components/page-container'
-import { supabase } from '../../lib/supabase'
+import { supabase } from '../../../lib/supabase'
 import { Toast } from '../../components/ui/toast'
 import { ConfirmDialog } from '../../components/ui/confirm-dialog'
 

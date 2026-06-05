@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { PageContainer } from '../components/page-container'
 import { KpiCard } from '../components/kpi-card'
-import { supabase } from '../lib/supabase'
+import { supabase } from '../../lib/supabase'
 import {
   AlertTriangle,
   Car,

@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { PageContainer } from '../../components/page-container'
-import { supabase } from '../../lib/supabase'
+import { supabase } from '../../../lib/supabase'
 import { Toast } from '../../components/ui/toast'
 import { ArrowLeft, Pencil, Trash2 } from 'lucide-react'
 import { ConfirmDialog } from '../../components/ui/confirm-dialog'

@@ -6,7 +6,7 @@ import { PageContainer } from '../components/page-container'
 import { CurrencyInput } from '../components/currency-input'
 import { Toast } from '../components/ui/toast'
 import { ConfirmDialog } from '../components/ui/confirm-dialog'
-import { supabase } from '../lib/supabase'
+import { supabase } from '../../lib/supabase'
 import { Pencil, Trash2 } from 'lucide-react'
 
 type Vehicle = {
