@@ -46,13 +46,13 @@ function getVehicleName(vehicle: VehicleDre) {
     const modelName = vehicle.vehicle_models?.name || ''
     const details = [brandName, modelName].filter(Boolean).join(' ')
 
-    return `${vehicle.plate} - ${brandName}`
+    return details ? `${vehicle.plate} - ${details}` : vehicle.plate
 }
 
 function getStatusBadge(status: string) {
     switch (status) {
         case 'EM_ESTOQUE':
-            return 'border-emerald-200 bg-emerald-50 text-emerald-700'
+            return 'border-blue-200 bg-blue-50 text-blue-700'
         case 'RESERVADO':
             return 'border-amber-200 bg-amber-50 text-amber-700'
         case 'VENDIDO':
@@ -122,9 +122,6 @@ export default function DrePage() {
         title: '',
         description: '',
     })
-
-    // Initialize selectedVehicleId from URL param via useState above.
-    // Avoid setting state synchronously inside an effect to prevent cascading renders.
 
     function showToast(
         type: 'success' | 'error',
