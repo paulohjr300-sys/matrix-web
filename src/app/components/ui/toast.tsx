@@ -22,12 +22,12 @@ export function Toast({
     const isSuccess = type === 'success'
 
     return (
-        <div className="fixed right-6 top-6 z-50 slide-up">
+        <div className="fixed right-8 top-30 z-[9999] z-50 slide-up">
             <div className="flex w-[360px] items-start gap-4 rounded-3xl border border-zinc-200 bg-white p-5 shadow-2xl shadow-zinc-300/70">
                 <div
                     className={`rounded-2xl p-2 ${isSuccess
-                            ? 'bg-emerald-50 text-emerald-600'
-                            : 'bg-red-50 text-red-600'
+                        ? 'bg-emerald-50 text-emerald-600'
+                        : 'bg-red-50 text-red-600'
                         }`}
                 >
                     {isSuccess ? <CheckCircle size={22} /> : <XCircle size={22} />}

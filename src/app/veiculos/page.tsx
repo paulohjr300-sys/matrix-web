@@ -958,15 +958,16 @@ export default function VeiculosPage() {
                                     <input
                                         type="file"
                                         accept="image/*"
+                                        multiple
                                         className="hidden"
                                         disabled={uploading}
                                         onChange={(event) => {
-                                            const file = event.target.files?.[0]
+                                            const files = Array.from(event.target.files || [])
                                             event.target.value = ''
 
-                                            if (file) {
+                                            files.forEach((file) => {
                                                 handleAddPendingFile(file, 'IMAGE')
-                                            }
+                                            })
                                         }}
                                     />
                                 </label>
@@ -977,15 +978,16 @@ export default function VeiculosPage() {
                                     <input
                                         type="file"
                                         accept="application/pdf"
+                                        multiple
                                         className="hidden"
                                         disabled={uploading}
                                         onChange={(event) => {
-                                            const file = event.target.files?.[0]
+                                            const files = Array.from(event.target.files || [])
                                             event.target.value = ''
 
-                                            if (file) {
+                                            files.forEach((file) => {
                                                 handleAddPendingFile(file, 'PDF')
-                                            }
+                                            })
                                         }}
                                     />
                                 </label>

@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
+import { RouteGuard } from '../components/auth/route-guard'
 
 type VehicleDre = {
     id: string
@@ -162,6 +163,7 @@ function DreContent() {
           `)
                 .order('created_at', { ascending: false })
 
+
             if (!isMounted) {
                 return
             }
@@ -170,6 +172,7 @@ function DreContent() {
                 showToast('error', 'Erro ao carregar DRE', error.message)
                 return
             }
+
 
             setVehicles((data || []) as unknown as VehicleDre[])
         }
@@ -239,292 +242,294 @@ function DreContent() {
 
 
     return (
-        <>
-            <PageContainer
-                title="DRE"
-                description="Demonstrativo de Resultado por veículo."
-            >
-                <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
-                    <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-xl shadow-zinc-200/50">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm text-zinc-500">Investimento total</p>
-                                <h2 className="mt-2 text-2xl font-bold">
-                                    {formatCurrency(totals.investment)}
-                                </h2>
-                            </div>
+        <RouteGuard allowedRoles={['ADMIN', 'GERENTE']}>
 
-                            <div className="rounded-2xl bg-red-50 p-3 text-red-600">
-                                <Car size={22} />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-xl shadow-zinc-200/50">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm text-zinc-500">Custos lançados</p>
-                                <h2 className="mt-2 text-2xl font-bold">
-                                    {formatCurrency(totals.costs)}
-                                </h2>
-                            </div>
-
-                            <div className="rounded-2xl bg-amber-50 p-3 text-amber-600">
-                                <DollarSign size={22} />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-xl shadow-zinc-200/50">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm text-zinc-500">Total vendido</p>
-                                <h2 className="mt-2 text-2xl font-bold">
-                                    {formatCurrency(totals.sales)}
-                                </h2>
-                            </div>
-
-                            <div className="rounded-2xl bg-emerald-50 p-3 text-emerald-600">
-                                <TrendingUp size={22} />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="rounded-3xl border border-zinc-200 bg-zinc-950 p-6 text-white shadow-xl shadow-zinc-300/60">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm text-zinc-400">Lucro total</p>
-                                <h2 className="mt-2 text-2xl font-bold">
-                                    {formatCurrency(totals.profit)}
-                                </h2>
-                            </div>
-
-                            <div
-                                className={`rounded-2xl p-3 ${totals.profit >= 0
-                                    ? 'bg-emerald-500/20 text-emerald-300'
-                                    : 'bg-red-500/20 text-red-300'
-                                    }`}
-                            >
-                                {totals.profit >= 0 ? (
-                                    <TrendingUp size={22} />
-                                ) : (
-                                    <TrendingDown size={22} />
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="mt-8 rounded-3xl border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-200/40">
-                    <label className="text-sm font-medium text-zinc-700">
-                        Buscar veículo
-                    </label>
-
-                    <input
-                        value={search}
-                        onChange={(event) => setSearch(event.target.value)}
-                        placeholder="Buscar por placa, marca ou modelo..."
-                        className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
-                    />
-                </div>
-
-                <div className="mt-8 space-y-4">
-                    {filteredVehicles.map((vehicle) => {
-                        const numbers = getNumbers(vehicle)
-                        const isOpen = selectedVehicleId === vehicle.id
-
-                        return (
-                            <div
-                                key={vehicle.id}
-                                className={`rounded-3xl border border-l-4 border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-200/50 transition-all duration-300 ${getStatusBorder(
-                                    vehicle.status
-                                )}`}
-                            >
-                                <div className="grid grid-cols-1 items-center gap-4 xl:grid-cols-6">
-                                    <div className="xl:col-span-2">
-                                        <h2 className="font-bold text-zinc-950">
-                                            {getVehicleName(vehicle)}
-                                        </h2>
-
-                                        <div className="mt-2">
-                                            <span
-                                                className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold ${getStatusBadge(
-                                                    vehicle.status
-                                                )}`}
-                                            >
-                                                <span
-                                                    className={`h-2 w-2 rounded-full ${getStatusDot(
-                                                        vehicle.status
-                                                    )}`}
-                                                />
-                                                {getStatusLabel(vehicle.status)}
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <p className="text-xs text-zinc-500">Investimento</p>
-                                        <strong>{formatCurrency(numbers.investment)}</strong>
-                                    </div>
-
-                                    <div>
-                                        <p className="text-xs text-zinc-500">Venda</p>
-                                        <strong>{formatCurrency(numbers.sale)}</strong>
-                                    </div>
-
-                                    <div>
-                                        <p className="text-xs text-zinc-500">Lucro</p>
-                                        <strong
-                                            className={
-                                                numbers.profit >= 0
-                                                    ? 'text-emerald-700'
-                                                    : 'text-red-700'
-                                            }
-                                        >
-                                            {formatCurrency(numbers.profit)}
-                                        </strong>
-                                    </div>
-
-                                    <div className="flex justify-end">
-                                        <button
-                                            onClick={() =>
-                                                setSelectedVehicleId(isOpen ? null : vehicle.id)
-                                            }
-                                            className="inline-flex items-center gap-2 rounded-2xl bg-zinc-950 px-4 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-zinc-800"
-                                        >
-                                            {isOpen ? 'Ocultar DRE' : 'Ver DRE'}
-                                            {isOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-                                        </button>
-                                    </div>
+            <>
+                <PageContainer
+                    title="DRE"
+                    description="Demonstrativo de Resultado por veículo."
+                >
+                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
+                        <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-xl shadow-zinc-200/50">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm text-zinc-500">Investimento total</p>
+                                    <h2 className="mt-2 text-2xl font-bold">
+                                        {formatCurrency(totals.investment)}
+                                    </h2>
                                 </div>
 
-                                {isOpen && (
-                                    <div className="slide-up mt-6 border-t border-zinc-200 pt-6">
-                                        <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
-                                            <div className="rounded-2xl bg-zinc-50 p-4">
-                                                <p className="text-xs font-semibold text-zinc-500">
-                                                    Compra
-                                                </p>
-                                                <strong className="mt-2 block text-lg">
-                                                    {formatCurrency(numbers.purchase)}
-                                                </strong>
-                                            </div>
+                                <div className="rounded-2xl bg-red-50 p-3 text-red-600">
+                                    <Car size={22} />
+                                </div>
+                            </div>
+                        </div>
 
-                                            <div className="rounded-2xl bg-zinc-50 p-4">
-                                                <p className="text-xs font-semibold text-zinc-500">
-                                                    Custos
-                                                </p>
-                                                <strong className="mt-2 block text-lg">
-                                                    {formatCurrency(numbers.costs)}
-                                                </strong>
-                                            </div>
+                        <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-xl shadow-zinc-200/50">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm text-zinc-500">Custos lançados</p>
+                                    <h2 className="mt-2 text-2xl font-bold">
+                                        {formatCurrency(totals.costs)}
+                                    </h2>
+                                </div>
 
-                                            <div className="rounded-2xl bg-zinc-50 p-4">
-                                                <p className="text-xs font-semibold text-zinc-500">
-                                                    Investimento
-                                                </p>
-                                                <strong className="mt-2 block text-lg">
-                                                    {formatCurrency(numbers.investment)}
-                                                </strong>
-                                            </div>
+                                <div className="rounded-2xl bg-amber-50 p-3 text-amber-600">
+                                    <DollarSign size={22} />
+                                </div>
+                            </div>
+                        </div>
 
-                                            <div className="rounded-2xl bg-zinc-50 p-4">
-                                                <p className="text-xs font-semibold text-zinc-500">
-                                                    Venda
-                                                </p>
-                                                <strong className="mt-2 block text-lg">
-                                                    {formatCurrency(numbers.sale)}
-                                                </strong>
-                                            </div>
+                        <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-xl shadow-zinc-200/50">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm text-zinc-500">Total vendido</p>
+                                    <h2 className="mt-2 text-2xl font-bold">
+                                        {formatCurrency(totals.sales)}
+                                    </h2>
+                                </div>
 
-                                            <div className="rounded-2xl bg-zinc-950 p-4 text-white">
-                                                <p className="text-xs font-semibold text-zinc-400">
-                                                    Margem
-                                                </p>
-                                                <strong className="mt-2 block text-lg">
-                                                    {formatPercent(numbers.margin)}
-                                                </strong>
+                                <div className="rounded-2xl bg-emerald-50 p-3 text-emerald-600">
+                                    <TrendingUp size={22} />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="rounded-3xl border border-zinc-200 bg-zinc-950 p-6 text-white shadow-xl shadow-zinc-300/60">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm text-zinc-400">Lucro total</p>
+                                    <h2 className="mt-2 text-2xl font-bold">
+                                        {formatCurrency(totals.profit)}
+                                    </h2>
+                                </div>
+
+                                <div
+                                    className={`rounded-2xl p-3 ${totals.profit >= 0
+                                        ? 'bg-emerald-500/20 text-emerald-300'
+                                        : 'bg-red-500/20 text-red-300'
+                                        }`}
+                                >
+                                    {totals.profit >= 0 ? (
+                                        <TrendingUp size={22} />
+                                    ) : (
+                                        <TrendingDown size={22} />
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="mt-8 rounded-3xl border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-200/40">
+                        <label className="text-sm font-medium text-zinc-700">
+                            Buscar veículo
+                        </label>
+
+                        <input
+                            value={search}
+                            onChange={(event) => setSearch(event.target.value)}
+                            placeholder="Buscar por placa, marca ou modelo..."
+                            className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                        />
+                    </div>
+
+                    <div className="mt-8 space-y-4">
+                        {filteredVehicles.map((vehicle) => {
+                            const numbers = getNumbers(vehicle)
+                            const isOpen = selectedVehicleId === vehicle.id
+
+                            return (
+                                <div
+                                    key={vehicle.id}
+                                    className={`rounded-3xl border border-l-4 border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-200/50 transition-all duration-300 ${getStatusBorder(
+                                        vehicle.status
+                                    )}`}
+                                >
+                                    <div className="grid grid-cols-1 items-center gap-4 xl:grid-cols-6">
+                                        <div className="xl:col-span-2">
+                                            <h2 className="font-bold text-zinc-950">
+                                                {getVehicleName(vehicle)}
+                                            </h2>
+
+                                            <div className="mt-2">
+                                                <span
+                                                    className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold ${getStatusBadge(
+                                                        vehicle.status
+                                                    )}`}
+                                                >
+                                                    <span
+                                                        className={`h-2 w-2 rounded-full ${getStatusDot(
+                                                            vehicle.status
+                                                        )}`}
+                                                    />
+                                                    {getStatusLabel(vehicle.status)}
+                                                </span>
                                             </div>
                                         </div>
 
-                                        <div className="mt-6 rounded-2xl border border-zinc-200">
-                                            <div className="grid grid-cols-2 border-b border-zinc-200 px-5 py-3 text-sm">
-                                                <span className="text-zinc-500">Valor de compra</span>
-                                                <strong className="text-right">
-                                                    {formatCurrency(numbers.purchase)}
-                                                </strong>
-                                            </div>
+                                        <div>
+                                            <p className="text-xs text-zinc-500">Investimento</p>
+                                            <strong>{formatCurrency(numbers.investment)}</strong>
+                                        </div>
 
-                                            <div className="grid grid-cols-2 border-b border-zinc-200 px-5 py-3 text-sm">
-                                                <span className="text-zinc-500">Custos adicionais</span>
-                                                <strong className="text-right">
-                                                    {formatCurrency(numbers.costs)}
-                                                </strong>
-                                            </div>
+                                        <div>
+                                            <p className="text-xs text-zinc-500">Venda</p>
+                                            <strong>{formatCurrency(numbers.sale)}</strong>
+                                        </div>
 
-                                            <div className="grid grid-cols-2 border-b border-zinc-200 bg-zinc-50 px-5 py-3 text-sm">
-                                                <span className="font-semibold text-zinc-700">
-                                                    Investimento total
-                                                </span>
-                                                <strong className="text-right">
-                                                    {formatCurrency(numbers.investment)}
-                                                </strong>
-                                            </div>
-
-                                            <div className="grid grid-cols-2 border-b border-zinc-200 px-5 py-3 text-sm">
-                                                <span className="text-zinc-500">Valor vendido</span>
-                                                <strong className="text-right">
-                                                    {formatCurrency(numbers.sale)}
-                                                </strong>
-                                            </div>
-
-                                            <div
-                                                className={`grid grid-cols-2 rounded-b-2xl px-5 py-4 text-sm ${numbers.profit >= 0 ? 'bg-emerald-50' : 'bg-red-50'
-                                                    }`}
+                                        <div>
+                                            <p className="text-xs text-zinc-500">Lucro</p>
+                                            <strong
+                                                className={
+                                                    numbers.profit >= 0
+                                                        ? 'text-emerald-700'
+                                                        : 'text-red-700'
+                                                }
                                             >
-                                                <span
-                                                    className={`font-bold ${numbers.profit >= 0
-                                                        ? 'text-emerald-700'
-                                                        : 'text-red-700'
-                                                        }`}
-                                                >
-                                                    Resultado final
-                                                </span>
+                                                {formatCurrency(numbers.profit)}
+                                            </strong>
+                                        </div>
 
-                                                <strong
-                                                    className={`text-right ${numbers.profit >= 0
-                                                        ? 'text-emerald-700'
-                                                        : 'text-red-700'
-                                                        }`}
-                                                >
-                                                    {formatCurrency(numbers.profit)}
-                                                </strong>
-                                            </div>
+                                        <div className="flex justify-end">
+                                            <button
+                                                onClick={() =>
+                                                    setSelectedVehicleId(isOpen ? null : vehicle.id)
+                                                }
+                                                className="inline-flex items-center gap-2 rounded-2xl bg-zinc-950 px-4 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-zinc-800"
+                                            >
+                                                {isOpen ? 'Ocultar DRE' : 'Ver DRE'}
+                                                {isOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                                            </button>
                                         </div>
                                     </div>
-                                )}
+
+                                    {isOpen && (
+                                        <div className="slide-up mt-6 border-t border-zinc-200 pt-6">
+                                            <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
+                                                <div className="rounded-2xl bg-zinc-50 p-4">
+                                                    <p className="text-xs font-semibold text-zinc-500">
+                                                        Compra
+                                                    </p>
+                                                    <strong className="mt-2 block text-lg">
+                                                        {formatCurrency(numbers.purchase)}
+                                                    </strong>
+                                                </div>
+
+                                                <div className="rounded-2xl bg-zinc-50 p-4">
+                                                    <p className="text-xs font-semibold text-zinc-500">
+                                                        Custos
+                                                    </p>
+                                                    <strong className="mt-2 block text-lg">
+                                                        {formatCurrency(numbers.costs)}
+                                                    </strong>
+                                                </div>
+
+                                                <div className="rounded-2xl bg-zinc-50 p-4">
+                                                    <p className="text-xs font-semibold text-zinc-500">
+                                                        Investimento
+                                                    </p>
+                                                    <strong className="mt-2 block text-lg">
+                                                        {formatCurrency(numbers.investment)}
+                                                    </strong>
+                                                </div>
+
+                                                <div className="rounded-2xl bg-zinc-50 p-4">
+                                                    <p className="text-xs font-semibold text-zinc-500">
+                                                        Venda
+                                                    </p>
+                                                    <strong className="mt-2 block text-lg">
+                                                        {formatCurrency(numbers.sale)}
+                                                    </strong>
+                                                </div>
+
+                                                <div className="rounded-2xl bg-zinc-950 p-4 text-white">
+                                                    <p className="text-xs font-semibold text-zinc-400">
+                                                        Margem
+                                                    </p>
+                                                    <strong className="mt-2 block text-lg">
+                                                        {formatPercent(numbers.margin)}
+                                                    </strong>
+                                                </div>
+                                            </div>
+
+                                            <div className="mt-6 rounded-2xl border border-zinc-200">
+                                                <div className="grid grid-cols-2 border-b border-zinc-200 px-5 py-3 text-sm">
+                                                    <span className="text-zinc-500">Valor de compra</span>
+                                                    <strong className="text-right">
+                                                        {formatCurrency(numbers.purchase)}
+                                                    </strong>
+                                                </div>
+
+                                                <div className="grid grid-cols-2 border-b border-zinc-200 px-5 py-3 text-sm">
+                                                    <span className="text-zinc-500">Custos adicionais</span>
+                                                    <strong className="text-right">
+                                                        {formatCurrency(numbers.costs)}
+                                                    </strong>
+                                                </div>
+
+                                                <div className="grid grid-cols-2 border-b border-zinc-200 bg-zinc-50 px-5 py-3 text-sm">
+                                                    <span className="font-semibold text-zinc-700">
+                                                        Investimento total
+                                                    </span>
+                                                    <strong className="text-right">
+                                                        {formatCurrency(numbers.investment)}
+                                                    </strong>
+                                                </div>
+
+                                                <div className="grid grid-cols-2 border-b border-zinc-200 px-5 py-3 text-sm">
+                                                    <span className="text-zinc-500">Valor vendido</span>
+                                                    <strong className="text-right">
+                                                        {formatCurrency(numbers.sale)}
+                                                    </strong>
+                                                </div>
+
+                                                <div
+                                                    className={`grid grid-cols-2 rounded-b-2xl px-5 py-4 text-sm ${numbers.profit >= 0 ? 'bg-emerald-50' : 'bg-red-50'
+                                                        }`}
+                                                >
+                                                    <span
+                                                        className={`font-bold ${numbers.profit >= 0
+                                                            ? 'text-emerald-700'
+                                                            : 'text-red-700'
+                                                            }`}
+                                                    >
+                                                        Resultado final
+                                                    </span>
+
+                                                    <strong
+                                                        className={`text-right ${numbers.profit >= 0
+                                                            ? 'text-emerald-700'
+                                                            : 'text-red-700'
+                                                            }`}
+                                                    >
+                                                        {formatCurrency(numbers.profit)}
+                                                    </strong>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )
+                        })}
+
+                        {filteredVehicles.length === 0 && (
+                            <div className="rounded-3xl border border-zinc-200 bg-white p-10 text-center text-zinc-500 shadow-xl shadow-zinc-200/50">
+                                Nenhum veículo encontrado.
                             </div>
-                        )
-                    })}
+                        )}
+                    </div>
+                </PageContainer>
 
-                    {filteredVehicles.length === 0 && (
-                        <div className="rounded-3xl border border-zinc-200 bg-white p-10 text-center text-zinc-500 shadow-xl shadow-zinc-200/50">
-                            Nenhum veículo encontrado.
-                        </div>
-                    )}
-                </div>
-            </PageContainer>
-
-            <Toast
-                open={toast.open}
-                type={toast.type}
-                title={toast.title}
-                description={toast.description}
-                onClose={() => setToast((current) => ({ ...current, open: false }))}
-            />
-        </>
+                <Toast
+                    open={toast.open}
+                    type={toast.type}
+                    title={toast.title}
+                    description={toast.description}
+                    onClose={() => setToast((current) => ({ ...current, open: false }))}
+                />
+            </>
+        </RouteGuard>
     )
-
 }
 export default function DrePage() {
     return (
@@ -537,5 +542,6 @@ export default function DrePage() {
         >
             <DreContent />
         </Suspense>
+
     )
 }

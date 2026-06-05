@@ -14,6 +14,7 @@ import {
   TrendingUp,
   Trophy,
 } from 'lucide-react'
+import { Toast } from '../components/ui/toast'
 
 type VehicleDashboard = {
   id: string
@@ -114,6 +115,52 @@ function getStatusClass(status: string) {
 export default function DashboardPage() {
   const [vehicles, setVehicles] = useState<VehicleDashboard[]>([])
 
+  const [toast, setToast] = useState(() => {
+    if (typeof window === 'undefined') {
+      return {
+        open: false,
+        type: 'error' as 'success' | 'error',
+        title: '',
+        description: '',
+      }
+    }
+
+    const error = localStorage.getItem('matrix_permission_error')
+
+    if (!error) {
+      return {
+        open: false,
+        type: 'error' as 'success' | 'error',
+        title: '',
+        description: '',
+      }
+    }
+
+    localStorage.removeItem('matrix_permission_error')
+
+    return {
+      open: true,
+      type: 'error' as 'success' | 'error',
+      title: 'Acesso negado',
+      description: error,
+    }
+  })
+
+  useEffect(() => {
+    if (!toast.open) {
+      return
+    }
+
+    const timer = window.setTimeout(() => {
+      setToast((current) => ({
+        ...current,
+        open: false,
+      }))
+    }, 4000)
+
+    return () => window.clearTimeout(timer)
+  }, [toast.open])
+
   useEffect(() => {
     async function loadDashboard() {
       const { data } = await supabase
@@ -138,6 +185,7 @@ export default function DashboardPage() {
 
     loadDashboard()
   }, [])
+
 
   const totals = vehicles.reduce(
     (acc, vehicle) => {
@@ -198,6 +246,7 @@ export default function DashboardPage() {
   const topProfitVehicle = soldVehicles[0]
 
   const latestVehicles = vehicles.slice(0, 5)
+
 
   return (
     <PageContainer
@@ -498,6 +547,19 @@ export default function DashboardPage() {
           </tbody>
         </table>
       </div>
+      <Toast
+        open={toast.open}
+        type={toast.type}
+        title={toast.title}
+        description={toast.description}
+        onClose={() =>
+          setToast((current) => ({
+            ...current,
+            open: false,
+          }))
+        }
+      />
     </PageContainer>
+
   )
 }

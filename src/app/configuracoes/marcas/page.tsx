@@ -8,6 +8,7 @@ import { supabase } from '../../../lib/supabase'
 import { Toast } from '../../components/ui/toast'
 import { ArrowLeft, Pencil, Trash2 } from 'lucide-react'
 import { ConfirmDialog } from '../../components/ui/confirm-dialog'
+import { RouteGuard } from '../../components/auth/route-guard'
 
 type Brand = {
     id: string
@@ -139,128 +140,130 @@ export default function MarcasPage() {
         await loadBrands()
     }
     return (
-        <>
-            <PageContainer
-                title="Marcas"
-                description="Cadastre e gerencie as marcas de veículos."
-                action={
-                    <button
-                        onClick={() => {
-                            setShowForm(!showForm)
-                            setEditingBrandId(null)
-                            setBrandName('')
-                        }}
-                        className="rounded-2xl bg-red-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-red-600/20 transition-all duration-300 hover:-translate-y-0.5 hover:bg-red-700"
-                    >
-                        {showForm ? 'Fechar' : '+ Nova marca'}
-                    </button>
-                }
-            >
-                <Link
-                    href="/configuracoes"
-                    className="mb-6 inline-flex items-center gap-2 text-sm font-semibold text-zinc-500 transition hover:text-red-600"
+        <RouteGuard allowedRoles={['ADMIN']}>
+            <>
+                <PageContainer
+                    title="Marcas"
+                    description="Cadastre e gerencie as marcas de veículos."
+                    action={
+                        <button
+                            onClick={() => {
+                                setShowForm(!showForm)
+                                setEditingBrandId(null)
+                                setBrandName('')
+                            }}
+                            className="rounded-2xl bg-red-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-red-600/20 transition-all duration-300 hover:-translate-y-0.5 hover:bg-red-700"
+                        >
+                            {showForm ? 'Fechar' : '+ Nova marca'}
+                        </button>
+                    }
                 >
-                    <ArrowLeft size={18} />
-                    Voltar para configurações
-                </Link>
+                    <Link
+                        href="/configuracoes"
+                        className="mb-6 inline-flex items-center gap-2 text-sm font-semibold text-zinc-500 transition hover:text-red-600"
+                    >
+                        <ArrowLeft size={18} />
+                        Voltar para configurações
+                    </Link>
 
-                {showForm && (
-                    <div className="slide-up mb-8 rounded-3xl border border-zinc-200 bg-white p-6 shadow-xl shadow-zinc-200/60">
-                        <h2 className="text-xl font-bold">
-                            {editingBrandId ? 'Editar marca' : 'Cadastrar marca'}
-                        </h2>
+                    {showForm && (
+                        <div className="slide-up mb-8 rounded-3xl border border-zinc-200 bg-white p-6 shadow-xl shadow-zinc-200/60">
+                            <h2 className="text-xl font-bold">
+                                {editingBrandId ? 'Editar marca' : 'Cadastrar marca'}
+                            </h2>
 
-                        <div className="mt-5 flex flex-col gap-4 md:flex-row">
-                            <input
-                                value={brandName}
-                                onChange={(event) => setBrandName(event.target.value)}
-                                placeholder="Ex: Honda"
-                                className="w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
-                            />
+                            <div className="mt-5 flex flex-col gap-4 md:flex-row">
+                                <input
+                                    value={brandName}
+                                    onChange={(event) => setBrandName(event.target.value)}
+                                    placeholder="Ex: Honda"
+                                    className="w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                                />
 
-                            <button
-                                onClick={handleSaveBrand}
-                                disabled={loading}
-                                className="rounded-xl bg-zinc-950 px-6 py-3 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:opacity-50"
-                            >
-                                {loading
-                                    ? 'Salvando...'
-                                    : editingBrandId
-                                        ? 'Salvar edição'
-                                        : 'Salvar'}
-                            </button>
-                        </div>
-                    </div>
-                )}
-
-                <div className="overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-xl shadow-zinc-200/50">
-                    <table className="w-full text-sm">
-                        <thead className="bg-zinc-950 text-white">
-                            <tr>
-                                <th className="px-5 py-4 text-left">Marca</th>
-                                <th className="px-5 py-4 text-right">Ações</th>
-                            </tr>
-                        </thead>
-
-                        <tbody>
-                            {brands.map((brand) => (
-                                <tr
-                                    key={brand.id}
-                                    className="border-t transition-colors duration-200 hover:bg-zinc-50"
+                                <button
+                                    onClick={handleSaveBrand}
+                                    disabled={loading}
+                                    className="rounded-xl bg-zinc-950 px-6 py-3 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:opacity-50"
                                 >
-                                    <td className="px-5 py-4 font-semibold">{brand.name}</td>
+                                    {loading
+                                        ? 'Salvando...'
+                                        : editingBrandId
+                                            ? 'Salvar edição'
+                                            : 'Salvar'}
+                                </button>
+                            </div>
+                        </div>
+                    )}
 
-                                    <td className="px-5 py-4">
-                                        <div className="flex justify-end gap-2">
-                                            <button
-                                                onClick={() => handleEditBrand(brand)}
-                                                className="rounded-xl bg-zinc-100 p-2 text-zinc-700 transition hover:bg-zinc-200"
-                                            >
-                                                <Pencil size={18} />
-                                            </button>
-
-                                            <button
-                                                onClick={() => setDeleteBrandId(brand.id)}
-                                                className="rounded-xl bg-red-50 p-2 text-red-600 transition hover:bg-red-100"
-                                            >
-                                                <Trash2 size={18} />
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
-
-                            {brands.length === 0 && (
+                    <div className="overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-xl shadow-zinc-200/50">
+                        <table className="w-full text-sm">
+                            <thead className="bg-zinc-950 text-white">
                                 <tr>
-                                    <td
-                                        colSpan={2}
-                                        className="px-5 py-10 text-center text-zinc-500"
-                                    >
-                                        Nenhuma marca cadastrada.
-                                    </td>
+                                    <th className="px-5 py-4 text-left">Marca</th>
+                                    <th className="px-5 py-4 text-right">Ações</th>
                                 </tr>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            </PageContainer>
-            <ConfirmDialog
-                open={!!deleteBrandId}
-                title="Excluir marca"
-                description="Deseja realmente excluir esta marca? Essa ação não poderá ser desfeita."
-                confirmText="Excluir marca"
-                loading={deleteLoading}
-                onCancel={() => setDeleteBrandId(null)}
-                onConfirm={handleDeleteBrand}
-            />
+                            </thead>
 
-            <Toast
-                open={toast.open}
-                type={toast.type}
-                title={toast.title}
-                description={toast.description}
-                onClose={() => setToast((current) => ({ ...current, open: false }))}
-            />
-        </>
+                            <tbody>
+                                {brands.map((brand) => (
+                                    <tr
+                                        key={brand.id}
+                                        className="border-t transition-colors duration-200 hover:bg-zinc-50"
+                                    >
+                                        <td className="px-5 py-4 font-semibold">{brand.name}</td>
+
+                                        <td className="px-5 py-4">
+                                            <div className="flex justify-end gap-2">
+                                                <button
+                                                    onClick={() => handleEditBrand(brand)}
+                                                    className="rounded-xl bg-zinc-100 p-2 text-zinc-700 transition hover:bg-zinc-200"
+                                                >
+                                                    <Pencil size={18} />
+                                                </button>
+
+                                                <button
+                                                    onClick={() => setDeleteBrandId(brand.id)}
+                                                    className="rounded-xl bg-red-50 p-2 text-red-600 transition hover:bg-red-100"
+                                                >
+                                                    <Trash2 size={18} />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+
+                                {brands.length === 0 && (
+                                    <tr>
+                                        <td
+                                            colSpan={2}
+                                            className="px-5 py-10 text-center text-zinc-500"
+                                        >
+                                            Nenhuma marca cadastrada.
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </PageContainer>
+                <ConfirmDialog
+                    open={!!deleteBrandId}
+                    title="Excluir marca"
+                    description="Deseja realmente excluir esta marca? Essa ação não poderá ser desfeita."
+                    confirmText="Excluir marca"
+                    loading={deleteLoading}
+                    onCancel={() => setDeleteBrandId(null)}
+                    onConfirm={handleDeleteBrand}
+                />
+
+                <Toast
+                    open={toast.open}
+                    type={toast.type}
+                    title={toast.title}
+                    description={toast.description}
+                    onClose={() => setToast((current) => ({ ...current, open: false }))}
+                />
+            </>
+        </RouteGuard>
     )
 }

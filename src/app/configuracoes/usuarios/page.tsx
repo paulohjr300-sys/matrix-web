@@ -6,6 +6,7 @@ import { Toast } from '../../components/ui/toast'
 import { supabase } from '../../../lib/supabase'
 import { UserPlus } from 'lucide-react'
 import { ConfirmDialog } from '../../components/ui/confirm-dialog'
+import { RouteGuard } from '../../components/auth/route-guard'
 
 type Profile = {
     id: string
@@ -224,7 +225,7 @@ export default function UsuariosPage() {
     }
 
     return (
-        <>
+        <RouteGuard allowedRoles={['ADMIN']}>
             <PageContainer
                 title="Usuários"
                 description="Gerencie usuários e perfis de acesso do sistema."
@@ -365,8 +366,8 @@ export default function UsuariosPage() {
                                             <button
                                                 onClick={() => setStatusUser(user)}
                                                 className={`rounded-xl px-4 py-2 text-xs font-semibold text-white ${user.is_active === false
-                                                        ? 'bg-green-600 hover:bg-green-700'
-                                                        : 'bg-amber-600 hover:bg-amber-700'
+                                                    ? 'bg-green-600 hover:bg-green-700'
+                                                    : 'bg-amber-600 hover:bg-amber-700'
                                                     }`}
                                             >
                                                 {user.is_active === false ? 'Ativar' : 'Desativar'}
@@ -434,6 +435,6 @@ export default function UsuariosPage() {
                 description={toast.description}
                 onClose={() => setToast((current) => ({ ...current, open: false }))}
             />
-        </>
+        </RouteGuard >
     )
 }
