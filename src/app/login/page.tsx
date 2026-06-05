@@ -35,14 +35,23 @@ export default function LoginPage() {
 
         const { data: profile, error: profileError } = await supabase
             .from('profiles')
-            .select('role, must_change_password')
+            .select('role, must_change_password, is_active')
             .eq('id', loginData.user.id)
             .single()
 
+
         setLoading(false)
+
+
 
         if (profileError || !profile) {
             setMessage('Não foi possível carregar seu perfil.')
+            return
+        }
+
+        if (profile.is_active === false) {
+            await supabase.auth.signOut()
+            setMessage('Usuário desativado. Procure o administrador.')
             return
         }
 
