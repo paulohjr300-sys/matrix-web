@@ -13,6 +13,7 @@ import {
     ChevronUp,
 } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
+import { Suspense } from 'react'
 
 type VehicleDre = {
     id: string
@@ -110,7 +111,7 @@ function getStatusLabel(status: string) {
     }
 }
 
-export default function DrePage() {
+function DreContent() {
     const [vehicles, setVehicles] = useState<VehicleDre[]>([])
     const [search, setSearch] = useState('')
     const searchParams = useSearchParams()
@@ -522,5 +523,19 @@ export default function DrePage() {
                 onClose={() => setToast((current) => ({ ...current, open: false }))}
             />
         </>
+    )
+
+}
+export default function DrePage() {
+    return (
+        <Suspense
+            fallback={
+                <div className="p-8 text-sm text-zinc-500">
+                    Carregando DRE...
+                </div>
+            }
+        >
+            <DreContent />
+        </Suspense>
     )
 }
