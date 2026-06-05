@@ -7,7 +7,7 @@ import { CurrencyInput } from '../components/currency-input'
 import { Toast } from '../components/ui/toast'
 import { ConfirmDialog } from '../components/ui/confirm-dialog'
 import { supabase } from '../../lib/supabase'
-import { Eye, FileText, ImageIcon, Pencil, Trash2, Upload } from 'lucide-react'
+import { Eye, FileText, ImageIcon, Pencil, Star, Trash2, Upload } from 'lucide-react'
 
 type Brand = {
     id: string
@@ -59,6 +59,7 @@ type Vehicle = {
     renavam: string | null
     notes: string | null
     status: string
+    main_photo_file_id: string | null
     brands?: { name: string } | null
     vehicle_models?: { name: string } | null
     engines?: { name: string } | null
@@ -314,6 +315,7 @@ export default function VeiculosPage() {
         renavam,
         notes,
         status,
+        main_photo_file_id,
         brands(name),
         vehicle_models(name),
         engines(name),
@@ -507,6 +509,25 @@ export default function VeiculosPage() {
         return data.publicUrl
     }
 
+    async function handleSetMainPhoto(fileId: string) {
+        if (!editingVehicleId) return
+
+        const { error } = await supabase
+            .from('vehicles')
+            .update({
+                main_photo_file_id: fileId,
+            })
+            .eq('id', editingVehicleId)
+
+        if (error) {
+            showToast('error', 'Erro', 'Não foi possível definir a foto principal.')
+            return
+        }
+
+        showToast('success', 'Foto principal definida', 'A foto principal foi atualizada.')
+        await loadVehicles()
+    }
+
     async function handleSaveVehicle() {
         if (!plate.trim()) {
             showToast('error', 'Campo obrigatório', 'Informe a placa do veículo.')
@@ -683,6 +704,15 @@ export default function VeiculosPage() {
             await loadVehicleFiles(editingVehicleId)
         }
     }
+
+    const editingVehicle = editingVehicleId
+        ? vehicles.find((vehicle) => vehicle.id === editingVehicleId)
+        : null
+
+    const pendingImages = pendingFiles.filter((file) => file.fileType === 'IMAGE')
+    const pendingDocuments = pendingFiles.filter((file) => file.fileType === 'PDF')
+    const savedImages = vehicleFiles.filter((file) => file.file_type === 'IMAGE')
+    const savedDocuments = vehicleFiles.filter((file) => file.file_type === 'PDF')
 
     return (
         <>
@@ -946,7 +976,7 @@ export default function VeiculosPage() {
                                         Fotos e documentos
                                     </h3>
                                     <p className="mt-1 text-sm text-zinc-500">
-                                        Você pode anexar fotos e PDFs antes de salvar o veículo.
+                                        Anexe várias fotos e PDFs de uma vez. As fotos ficam separadas dos documentos.
                                     </p>
                                 </div>
                             </div>
@@ -954,7 +984,7 @@ export default function VeiculosPage() {
                             <div className="mt-5 flex flex-wrap gap-3">
                                 <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-red-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-red-700">
                                     <Upload size={18} />
-                                    Enviar foto
+                                    Enviar fotos
                                     <input
                                         type="file"
                                         accept="image/*"
@@ -974,7 +1004,7 @@ export default function VeiculosPage() {
 
                                 <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-zinc-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-zinc-800">
                                     <Upload size={18} />
-                                    Enviar PDF
+                                    Enviar PDFs
                                     <input
                                         type="file"
                                         accept="application/pdf"
@@ -993,94 +1023,219 @@ export default function VeiculosPage() {
                                 </label>
                             </div>
 
-                            <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
-                                {pendingFiles.map((item) => (
-                                    <div
-                                        key={item.localId}
-                                        className="flex items-center justify-between gap-4 rounded-2xl border border-amber-200 bg-amber-50 p-4"
-                                    >
-                                        <div className="flex min-w-0 items-center gap-3">
-                                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-amber-700">
-                                                {item.fileType === 'IMAGE' ? (
-                                                    <ImageIcon size={20} />
-                                                ) : (
-                                                    <FileText size={20} />
-                                                )}
+                            <div className="mt-8">
+                                <div className="mb-4 flex items-center justify-between">
+                                    <div>
+                                        <h4 className="text-base font-bold text-zinc-950">Fotos</h4>
+                                        <p className="text-sm text-zinc-500">
+                                            Escolha uma foto salva como principal do veículo.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 gap-4 md:grid-cols-3 xl:grid-cols-4">
+                                    {pendingImages.map((item) => (
+                                        <div
+                                            key={item.localId}
+                                            className="overflow-hidden rounded-2xl border border-amber-200 bg-amber-50"
+                                        >
+                                            <div className="flex h-36 items-center justify-center bg-white text-amber-700">
+                                                <ImageIcon size={32} />
                                             </div>
 
-                                            <div className="min-w-0">
+                                            <div className="p-4">
                                                 <p className="truncate text-sm font-semibold text-zinc-950">
                                                     {item.file.name}
                                                 </p>
-                                                <p className="text-xs text-amber-700">
+                                                <p className="mt-1 text-xs text-amber-700">
                                                     Aguardando salvar · {formatFileSize(item.file.size)}
                                                 </p>
+
+                                                <button
+                                                    onClick={() =>
+                                                        setPendingFiles((current) =>
+                                                            current.filter((file) => file.localId !== item.localId)
+                                                        )
+                                                    }
+                                                    className="mt-3 inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-xs font-bold text-red-600 transition hover:bg-red-50"
+                                                >
+                                                    <Trash2 size={16} />
+                                                    Remover
+                                                </button>
                                             </div>
                                         </div>
+                                    ))}
 
-                                        <button
-                                            onClick={() =>
-                                                setPendingFiles((current) =>
-                                                    current.filter((file) => file.localId !== item.localId)
-                                                )
-                                            }
-                                            className="rounded-xl bg-white p-2 text-red-600 transition hover:bg-red-50"
-                                        >
-                                            <Trash2 size={18} />
-                                        </button>
-                                    </div>
-                                ))}
+                                    {savedImages.map((file) => {
+                                        const isMainPhoto = editingVehicle?.main_photo_file_id === file.id
 
-                                {vehicleFiles.map((file) => (
-                                    <div
-                                        key={file.id}
-                                        className="flex items-center justify-between gap-4 rounded-2xl border border-zinc-200 bg-white p-4"
-                                    >
-                                        <div className="flex min-w-0 items-center gap-3">
-                                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-zinc-100 text-zinc-700">
-                                                {file.file_type === 'IMAGE' ? (
-                                                    <ImageIcon size={20} />
-                                                ) : (
-                                                    <FileText size={20} />
-                                                )}
-                                            </div>
-
-                                            <div className="min-w-0">
-                                                <p className="truncate text-sm font-semibold text-zinc-950">
-                                                    {file.file_name}
-                                                </p>
-                                                <p className="text-xs text-zinc-500">
-                                                    {file.file_type === 'IMAGE' ? 'Foto' : 'PDF'} ·{' '}
-                                                    {formatFileSize(file.file_size)}
-                                                </p>
-                                            </div>
-                                        </div>
-
-                                        <div className="flex shrink-0 gap-2">
-                                            <a
-                                                href={getPublicFileUrl(file)}
-                                                target="_blank"
-                                                rel="noreferrer"
-                                                className="rounded-xl bg-zinc-100 px-3 py-2 text-xs font-bold text-zinc-700 transition hover:bg-zinc-200"
+                                        return (
+                                            <div
+                                                key={file.id}
+                                                className={`overflow-hidden rounded-2xl border bg-white ${isMainPhoto
+                                                        ? 'border-red-300 ring-2 ring-red-100'
+                                                        : 'border-zinc-200'
+                                                    }`}
                                             >
-                                                Abrir
-                                            </a>
+                                                <a
+                                                    href={getPublicFileUrl(file)}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    className="block"
+                                                >
+                                                    <img
+                                                        src={getPublicFileUrl(file)}
+                                                        alt={file.file_name}
+                                                        className="h-36 w-full object-cover"
+                                                    />
+                                                </a>
+
+                                                <div className="p-4">
+                                                    <div className="flex items-start justify-between gap-2">
+                                                        <div className="min-w-0">
+                                                            <p className="truncate text-sm font-semibold text-zinc-950">
+                                                                {file.file_name}
+                                                            </p>
+                                                            <p className="mt-1 text-xs text-zinc-500">
+                                                                Foto · {formatFileSize(file.file_size)}
+                                                            </p>
+                                                        </div>
+
+                                                        {isMainPhoto && (
+                                                            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-red-50 px-2 py-1 text-[10px] font-bold text-red-600">
+                                                                <Star size={12} fill="currentColor" />
+                                                                Principal
+                                                            </span>
+                                                        )}
+                                                    </div>
+
+                                                    <div className="mt-4 flex flex-wrap gap-2">
+                                                        {!isMainPhoto && (
+                                                            <button
+                                                                onClick={() => void handleSetMainPhoto(file.id)}
+                                                                className="rounded-xl bg-zinc-950 px-3 py-2 text-xs font-bold text-white transition hover:bg-zinc-800"
+                                                            >
+                                                                Definir principal
+                                                            </button>
+                                                        )}
+
+                                                        <a
+                                                            href={getPublicFileUrl(file)}
+                                                            target="_blank"
+                                                            rel="noreferrer"
+                                                            className="rounded-xl bg-zinc-100 px-3 py-2 text-xs font-bold text-zinc-700 transition hover:bg-zinc-200"
+                                                        >
+                                                            Abrir
+                                                        </a>
+
+                                                        <button
+                                                            onClick={() => setDeleteFile(file)}
+                                                            className="rounded-xl bg-red-50 p-2 text-red-600 transition hover:bg-red-100"
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )
+                                    })}
+
+                                    {pendingImages.length === 0 && savedImages.length === 0 && (
+                                        <div className="rounded-2xl bg-white p-6 text-center text-sm text-zinc-500 md:col-span-3 xl:col-span-4">
+                                            Nenhuma foto anexada para este veículo.
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="mt-8">
+                                <div className="mb-4">
+                                    <h4 className="text-base font-bold text-zinc-950">Documentos PDF</h4>
+                                    <p className="text-sm text-zinc-500">
+                                        CRLV, nota fiscal, laudo cautelar, contrato e outros documentos.
+                                    </p>
+                                </div>
+
+                                <div className="space-y-3">
+                                    {pendingDocuments.map((item) => (
+                                        <div
+                                            key={item.localId}
+                                            className="flex items-center justify-between gap-4 rounded-2xl border border-amber-200 bg-amber-50 p-4"
+                                        >
+                                            <div className="flex min-w-0 items-center gap-3">
+                                                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-amber-700">
+                                                    <FileText size={20} />
+                                                </div>
+
+                                                <div className="min-w-0">
+                                                    <p className="truncate text-sm font-semibold text-zinc-950">
+                                                        {item.file.name}
+                                                    </p>
+                                                    <p className="text-xs text-amber-700">
+                                                        Aguardando salvar · {formatFileSize(item.file.size)}
+                                                    </p>
+                                                </div>
+                                            </div>
 
                                             <button
-                                                onClick={() => setDeleteFile(file)}
-                                                className="rounded-xl bg-red-50 p-2 text-red-600 transition hover:bg-red-100"
+                                                onClick={() =>
+                                                    setPendingFiles((current) =>
+                                                        current.filter((file) => file.localId !== item.localId)
+                                                    )
+                                                }
+                                                className="rounded-xl bg-white p-2 text-red-600 transition hover:bg-red-50"
                                             >
                                                 <Trash2 size={18} />
                                             </button>
                                         </div>
-                                    </div>
-                                ))}
+                                    ))}
 
-                                {pendingFiles.length === 0 && vehicleFiles.length === 0 && (
-                                    <div className="rounded-2xl bg-white p-6 text-center text-sm text-zinc-500 md:col-span-2">
-                                        Nenhum arquivo anexado para este veículo.
-                                    </div>
-                                )}
+                                    {savedDocuments.map((file) => (
+                                        <div
+                                            key={file.id}
+                                            className="flex items-center justify-between gap-4 rounded-2xl border border-zinc-200 bg-white p-4"
+                                        >
+                                            <div className="flex min-w-0 items-center gap-3">
+                                                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-zinc-100 text-zinc-700">
+                                                    <FileText size={20} />
+                                                </div>
+
+                                                <div className="min-w-0">
+                                                    <p className="truncate text-sm font-semibold text-zinc-950">
+                                                        {file.file_name}
+                                                    </p>
+                                                    <p className="text-xs text-zinc-500">
+                                                        PDF · {formatFileSize(file.file_size)}
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex shrink-0 gap-2">
+                                                <a
+                                                    href={getPublicFileUrl(file)}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    className="rounded-xl bg-zinc-100 px-3 py-2 text-xs font-bold text-zinc-700 transition hover:bg-zinc-200"
+                                                >
+                                                    Abrir
+                                                </a>
+
+                                                <button
+                                                    onClick={() => setDeleteFile(file)}
+                                                    className="rounded-xl bg-red-50 p-2 text-red-600 transition hover:bg-red-100"
+                                                >
+                                                    <Trash2 size={18} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+
+                                    {pendingDocuments.length === 0 && savedDocuments.length === 0 && (
+                                        <div className="rounded-2xl bg-white p-6 text-center text-sm text-zinc-500">
+                                            Nenhum documento PDF anexado para este veículo.
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
 
