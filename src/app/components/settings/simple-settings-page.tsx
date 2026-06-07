@@ -80,7 +80,11 @@ export function SimpleSettingsPage({
     }
 
     useEffect(() => {
-        loadItems()
+        async function fetchItems() {
+            await loadItems()
+        }
+
+        fetchItems()
     }, [])
 
     async function handleSave() {

@@ -9,6 +9,7 @@ import {
     CreditCard,
     Tags,
     Gauge,
+    ImageIcon,
     Users,
 } from 'lucide-react'
 import { RouteGuard } from '../components/auth/route-guard'
@@ -24,6 +25,12 @@ const items = [
         title: 'Modelos',
         description: 'Vincule modelos às marcas cadastradas.',
         href: '/configuracoes/modelos',
+        icon: Car,
+    },
+    {
+        title: 'Categorias de veículos',
+        description: 'Hatch, Sedan, SUV, Picape e outros.',
+        href: '/configuracoes/categorias-veiculos',
         icon: Car,
     },
     {
@@ -61,6 +68,12 @@ const items = [
         description: 'Manutenção, documentação, lavagem e outros.',
         href: '/configuracoes/categorias-custos',
         icon: Wrench,
+    },
+    {
+        title: 'Banners do site',
+        description: 'Gerencie os banners exibidos na home do site público.',
+        href: '/configuracoes/banners',
+        icon: ImageIcon,
     },
     {
         title: 'Usuários',

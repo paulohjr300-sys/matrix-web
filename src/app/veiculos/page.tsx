@@ -46,6 +46,7 @@ type Vehicle = {
     plate: string
     brand_id: string | null
     model_id: string | null
+    category_id: string | null
     engine_id: string | null
     transmission_id: string | null
     fuel_id: string | null
@@ -59,9 +60,11 @@ type Vehicle = {
     renavam: string | null
     notes: string | null
     status: string
+    is_published: boolean
     main_photo_file_id: string | null
     brands?: { name: string } | null
     vehicle_models?: { name: string } | null
+    vehicle_categories?: { name: string } | null
     engines?: { name: string } | null
     transmissions?: { name: string } | null
     fuels?: { name: string } | null
@@ -134,12 +137,14 @@ export default function VeiculosPage() {
     const [transmissions, setTransmissions] = useState<SimpleOption[]>([])
     const [fuels, setFuels] = useState<SimpleOption[]>([])
     const [colors, setColors] = useState<SimpleOption[]>([])
+    const [categories, setCategories] = useState<SimpleOption[]>([])
 
     const [showForm, setShowForm] = useState(false)
     const [editingVehicleId, setEditingVehicleId] = useState<string | null>(null)
 
     const [plate, setPlate] = useState('')
     const [brandId, setBrandId] = useState('')
+    const [categoryId, setCategoryId] = useState('')
     const [modelId, setModelId] = useState('')
     const [engineId, setEngineId] = useState('')
     const [transmissionId, setTransmissionId] = useState('')
@@ -167,6 +172,9 @@ export default function VeiculosPage() {
 
     const [search, setSearch] = useState('')
     const [statusFilter, setStatusFilter] = useState('')
+    const [isPublished, setIsPublished] = useState(false)
+    const [mainPhotoFileId, setMainPhotoFileId] = useState<string | null>(null)
+    const [publishedFilter, setPublishedFilter] = useState('')
 
     const [toast, setToast] = useState({
         open: false,
@@ -176,23 +184,34 @@ export default function VeiculosPage() {
     })
 
     const filteredModels = models.filter((model) => model.brand_id === brandId)
+    const [publishConfirmOpen, setPublishConfirmOpen] = useState(false)
+
+    const publishedVehiclesCount = vehicles.filter((vehicle) => vehicle.is_published).length
 
     const filteredVehicles = vehicles.filter((vehicle) => {
         const brandName = vehicle.brands?.name || ''
         const modelName = vehicle.vehicle_models?.name || ''
         const colorName = vehicle.colors?.name || ''
+        const categoryName = vehicle.vehicle_categories?.name || ''
+        const matchesPublished =
+            publishedFilter === ''
+                ? true
+                : publishedFilter === 'PUBLICADO'
+                    ? vehicle.is_published === true
+                    : vehicle.is_published !== true
 
         const matchesSearch =
             vehicle.plate.toLowerCase().includes(search.toLowerCase()) ||
             brandName.toLowerCase().includes(search.toLowerCase()) ||
             modelName.toLowerCase().includes(search.toLowerCase()) ||
             colorName.toLowerCase().includes(search.toLowerCase()) ||
+            categoryName.toLowerCase().includes(search.toLowerCase()) ||
             (vehicle.chassi || '').toLowerCase().includes(search.toLowerCase()) ||
             (vehicle.renavam || '').toLowerCase().includes(search.toLowerCase())
 
         const matchesStatus = statusFilter ? vehicle.status === statusFilter : true
 
-        return matchesSearch && matchesStatus
+        return matchesSearch && matchesStatus && matchesPublished
     })
 
     function showToast(
@@ -216,6 +235,7 @@ export default function VeiculosPage() {
         setEditingVehicleId(null)
         setPlate('')
         setBrandId('')
+        setCategoryId('')
         setModelId('')
         setEngineId('')
         setTransmissionId('')
@@ -229,6 +249,8 @@ export default function VeiculosPage() {
         setChassi('')
         setRenavam('')
         setNotes('')
+        setIsPublished(false)
+        setMainPhotoFileId(null)
         setStatus('EM_ESTOQUE')
         setVehicleFiles([])
         setPendingFiles([])
@@ -264,12 +286,13 @@ export default function VeiculosPage() {
     }
 
     async function loadOptions() {
-        const [enginesRes, transmissionsRes, fuelsRes, colorsRes] =
+        const [enginesRes, transmissionsRes, fuelsRes, colorsRes, categoriesRes] =
             await Promise.all([
                 supabase.from('engines').select('id, name').order('name'),
                 supabase.from('transmissions').select('id, name').order('name'),
                 supabase.from('fuels').select('id, name').order('name'),
                 supabase.from('colors').select('id, name').order('name'),
+                supabase.from('vehicle_categories').select('id, name').order('name'),
             ])
 
         if (enginesRes.error) {
@@ -288,10 +311,15 @@ export default function VeiculosPage() {
             showToast('error', 'Erro', 'Não foi possível carregar as cores.')
         }
 
+        if (categoriesRes.error) {
+            showToast('error', 'Erro', 'Não foi possível carregar as categorias.')
+        }
+
         setEngines(enginesRes.data || [])
         setTransmissions(transmissionsRes.data || [])
         setFuels(fuelsRes.data || [])
         setColors(colorsRes.data || [])
+        setCategories(categoriesRes.data || [])
     }
 
     async function loadVehicles() {
@@ -308,6 +336,8 @@ export default function VeiculosPage() {
         color_id,
         manufacture_year,
         model_year,
+        category_id,
+        vehicle_categories(name),
         km,
         purchase_price,
         advertised_price,
@@ -316,6 +346,7 @@ export default function VeiculosPage() {
         notes,
         status,
         main_photo_file_id,
+        is_published,
         brands(name),
         vehicle_models(name),
         engines(name),
@@ -427,7 +458,7 @@ export default function VeiculosPage() {
         vehicleId: string,
         file: File,
         fileType: 'IMAGE' | 'PDF'
-    ) {
+    ): Promise<VehicleFile | null> {
         const bucket = fileType === 'IMAGE' ? 'vehicle-images' : 'vehicle-documents'
         const finalFile = fileType === 'IMAGE' ? await compressImage(file) : file
 
@@ -449,19 +480,25 @@ export default function VeiculosPage() {
             throw new Error(uploadError.message)
         }
 
-        const { error: insertError } = await supabase.from('vehicle_files').insert({
-            vehicle_id: vehicleId,
-            file_name: finalFile.name,
-            file_path: filePath,
-            file_type: fileType,
-            file_size: finalFile.size,
-            mime_type: finalFile.type,
-        })
+        const { data, error: insertError } = await supabase
+            .from('vehicle_files')
+            .insert({
+                vehicle_id: vehicleId,
+                file_name: finalFile.name,
+                file_path: filePath,
+                file_type: fileType,
+                file_size: finalFile.size,
+                mime_type: finalFile.type,
+            })
+            .select('id, vehicle_id, file_name, file_path, file_type, file_size, mime_type')
+            .single()
 
         if (insertError) {
             await supabase.storage.from(bucket).remove([filePath])
             throw new Error(insertError.message)
         }
+
+        return data as VehicleFile
     }
 
     async function uploadPendingFiles(vehicleId: string) {
@@ -470,8 +507,35 @@ export default function VeiculosPage() {
         setUploading(true)
 
         try {
+            let firstUploadedImageId: string | null = null
+
             for (const item of pendingFiles) {
-                await handleUploadFileToVehicle(vehicleId, item.file, item.fileType)
+                const uploadedFile = await handleUploadFileToVehicle(
+                    vehicleId,
+                    item.file,
+                    item.fileType
+                )
+
+                if (
+                    item.fileType === 'IMAGE' &&
+                    uploadedFile?.id &&
+                    !firstUploadedImageId
+                ) {
+                    firstUploadedImageId = uploadedFile.id
+                }
+            }
+
+            if (!mainPhotoFileId && firstUploadedImageId) {
+                const { error } = await supabase
+                    .from('vehicles')
+                    .update({
+                        main_photo_file_id: firstUploadedImageId,
+                    })
+                    .eq('id', vehicleId)
+
+                if (!error) {
+                    setMainPhotoFileId(firstUploadedImageId)
+                }
             }
 
             setPendingFiles([])
@@ -509,24 +573,6 @@ export default function VeiculosPage() {
         return data.publicUrl
     }
 
-    async function handleSetMainPhoto(fileId: string) {
-        if (!editingVehicleId) return
-
-        const { error } = await supabase
-            .from('vehicles')
-            .update({
-                main_photo_file_id: fileId,
-            })
-            .eq('id', editingVehicleId)
-
-        if (error) {
-            showToast('error', 'Erro', 'Não foi possível definir a foto principal.')
-            return
-        }
-
-        showToast('success', 'Foto principal definida', 'A foto principal foi atualizada.')
-        await loadVehicles()
-    }
 
     async function handleSaveVehicle() {
         if (!plate.trim()) {
@@ -569,9 +615,11 @@ export default function VeiculosPage() {
 
         setLoading(true)
 
+        const finalIsPublished = status === 'VENDIDO' ? false : isPublished
         const vehicleData = {
             plate: plate.trim().toUpperCase(),
             brand_id: brandId,
+            category_id: categoryId || null,
             model_id: modelId,
             engine_id: engineId || null,
             transmission_id: transmissionId || null,
@@ -585,6 +633,8 @@ export default function VeiculosPage() {
             chassi: chassi || null,
             renavam: renavam || null,
             notes: notes.trim() || null,
+            is_published: finalIsPublished,
+            main_photo_file_id: mainPhotoFileId,
             status,
         }
 
@@ -635,6 +685,7 @@ export default function VeiculosPage() {
         setEditingVehicleId(vehicle.id)
         setPlate(vehicle.plate)
         setBrandId(vehicle.brand_id || '')
+        setCategoryId(vehicle.category_id || '')
         setModelId(vehicle.model_id || '')
         setEngineId(vehicle.engine_id || '')
         setTransmissionId(vehicle.transmission_id || '')
@@ -651,6 +702,8 @@ export default function VeiculosPage() {
         setStatus(vehicle.status)
         setPendingFiles([])
         setShowForm(true)
+        setIsPublished(vehicle.is_published || false)
+        setMainPhotoFileId(vehicle.main_photo_file_id || null)
         void loadVehicleFiles(vehicle.id)
     }
 
@@ -714,6 +767,87 @@ export default function VeiculosPage() {
     const savedImages = vehicleFiles.filter((file) => file.file_type === 'IMAGE')
     const savedDocuments = vehicleFiles.filter((file) => file.file_type === 'PDF')
 
+    async function handleSetMainPhoto(fileId: string) {
+        setMainPhotoFileId(fileId)
+
+        if (!editingVehicleId) {
+            showToast(
+                'success',
+                'Foto principal selecionada',
+                'Ao salvar o veículo, essa foto será usada como capa no site.'
+            )
+            return
+        }
+
+        const { error } = await supabase
+            .from('vehicles')
+            .update({
+                main_photo_file_id: fileId,
+            })
+            .eq('id', editingVehicleId)
+
+        if (error) {
+            showToast('error', 'Erro', 'Não foi possível definir a foto principal.')
+            return
+        }
+
+        showToast(
+            'success',
+            'Foto principal definida',
+            'Essa foto será usada como capa no site.'
+        )
+
+        await loadVehicles()
+    }
+
+    async function handleTogglePublished() {
+        if (status === 'VENDIDO' && !isPublished) {
+            setPublishConfirmOpen(false)
+            showToast(
+                'error',
+                'Não é possível publicar',
+                'Veículos vendidos não podem aparecer no site.'
+            )
+            return
+        }
+
+        const newValue = !isPublished
+
+        setIsPublished(newValue)
+        setPublishConfirmOpen(false)
+
+        if (!editingVehicleId) {
+            showToast(
+                'success',
+                newValue ? 'Marcado para publicar' : 'Marcado para despublicar',
+                'A alteração será aplicada quando você salvar o veículo.'
+            )
+            return
+        }
+
+        const { error } = await supabase
+            .from('vehicles')
+            .update({
+                is_published: newValue,
+            })
+            .eq('id', editingVehicleId)
+
+        if (error) {
+            setIsPublished(!newValue)
+            showToast('error', 'Erro', 'Não foi possível alterar a publicação.')
+            return
+        }
+
+        showToast(
+            'success',
+            newValue ? 'Veículo publicado' : 'Veículo despublicado',
+            newValue
+                ? 'Este veículo agora aparece no site.'
+                : 'Este veículo foi removido do site.'
+        )
+
+        await loadVehicles()
+    }
     return (
         <>
             <PageContainer
@@ -786,6 +920,23 @@ export default function VeiculosPage() {
                                     {filteredModels.map((model) => (
                                         <option key={model.id} value={model.id}>
                                             {model.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+
+                            <div>
+                                <label className="text-sm font-medium text-zinc-700">Categoria</label>
+                                <select
+                                    value={categoryId}
+                                    onChange={(event) => setCategoryId(event.target.value)}
+                                    className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                                >
+                                    <option value="">Selecione</option>
+                                    {categories.map((category) => (
+                                        <option key={category.id} value={category.id}>
+                                            {category.name}
                                         </option>
                                     ))}
                                 </select>
@@ -944,7 +1095,15 @@ export default function VeiculosPage() {
                                 <label className="text-sm font-medium text-zinc-700">Status</label>
                                 <select
                                     value={status}
-                                    onChange={(event) => setStatus(event.target.value)}
+                                    onChange={(event) => {
+                                        const newStatus = event.target.value
+
+                                        setStatus(newStatus)
+
+                                        if (newStatus === 'VENDIDO') {
+                                            setIsPublished(false)
+                                        }
+                                    }}
                                     className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
                                 >
                                     {statusOptions.map((item) => (
@@ -954,7 +1113,28 @@ export default function VeiculosPage() {
                                     ))}
                                 </select>
                             </div>
+                            <div>
+                                <label className="text-sm font-medium text-zinc-700">
+                                    Publicação no site
+                                </label>
 
+                                <button
+                                    type="button"
+                                    onClick={() => setPublishConfirmOpen(true)}
+                                    className={`mt-2 flex w-full items-center justify-center rounded-xl px-4 py-3 text-sm font-bold shadow-sm transition hover:-translate-y-0.5 ${isPublished
+                                        ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                                        : 'bg-zinc-950 text-white hover:bg-zinc-800'
+                                        }`}
+                                >
+                                    {isPublished ? 'Publicado no site' : 'Publicar no site'}
+                                </button>
+
+                                <p className="mt-1 text-xs text-zinc-500">
+                                    {isPublished
+                                        ? 'Este veículo aparece no site.'
+                                        : 'Este veículo ainda não aparece no site.'}
+                                </p>
+                            </div>
                             <div className="md:col-span-3">
                                 <label className="text-sm font-medium text-zinc-700">
                                     Observações
@@ -1073,8 +1253,8 @@ export default function VeiculosPage() {
                                             <div
                                                 key={file.id}
                                                 className={`overflow-hidden rounded-2xl border bg-white ${isMainPhoto
-                                                        ? 'border-red-300 ring-2 ring-red-100'
-                                                        : 'border-zinc-200'
+                                                    ? 'border-red-300 ring-2 ring-red-100'
+                                                    : 'border-zinc-200'
                                                     }`}
                                             >
                                                 <a
@@ -1253,7 +1433,16 @@ export default function VeiculosPage() {
                     </div>
                 )}
 
-                <div className="mt-8 grid grid-cols-1 gap-4 rounded-3xl border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-200/40 md:grid-cols-3">
+                <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-3">
+                    <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-200/40">
+                        <p className="text-sm text-zinc-500">Publicados no site</p>
+                        <strong className="mt-2 block text-3xl text-emerald-700">
+                            {publishedVehiclesCount}
+                        </strong>
+                    </div>
+                </div>
+
+                <div className="mt-6 grid grid-cols-1 gap-4 rounded-3xl border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-200/40 md:grid-cols-4">
                     <div className="md:col-span-2">
                         <label className="text-sm font-medium text-zinc-700">
                             Buscar veículo
@@ -1284,6 +1473,22 @@ export default function VeiculosPage() {
                             ))}
                         </select>
                     </div>
+
+                    <div>
+                        <label className="text-sm font-medium text-zinc-700">
+                            Publicação
+                        </label>
+
+                        <select
+                            value={publishedFilter}
+                            onChange={(event) => setPublishedFilter(event.target.value)}
+                            className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                        >
+                            <option value="">Todos</option>
+                            <option value="PUBLICADO">Publicados</option>
+                            <option value="NAO_PUBLICADO">Não publicados</option>
+                        </select>
+                    </div>
                 </div>
 
                 <div className="fade-in mt-8 overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-xl shadow-zinc-200/50">
@@ -1293,13 +1498,15 @@ export default function VeiculosPage() {
                                 <th className="px-5 py-4 text-left">Placa</th>
                                 <th className="px-5 py-4 text-left">Marca</th>
                                 <th className="px-5 py-4 text-left">Modelo</th>
+                                <th className="px-5 py-4 text-left">Categoria</th>
                                 <th className="px-5 py-4 text-left">Cor</th>
                                 <th className="px-5 py-4 text-left">Motor</th>
-                                <th className="px-5 py-4 text-left">Câmbio</th>
+
                                 <th className="px-5 py-4 text-left">Ano</th>
                                 <th className="px-5 py-4 text-left">KM</th>
-                                <th className="px-5 py-4 text-left">Compra</th>
+
                                 <th className="px-5 py-4 text-left">Anunciado</th>
+                                <th className="px-5 py-4 text-left">Site</th>
                                 <th className="px-5 py-4 text-left">Status</th>
                                 <th className="px-5 py-4 text-right">Ações</th>
                             </tr>
@@ -1314,9 +1521,10 @@ export default function VeiculosPage() {
                                     <td className="px-5 py-4 font-semibold">{vehicle.plate}</td>
                                     <td className="px-5 py-4">{vehicle.brands?.name || '-'}</td>
                                     <td className="px-5 py-4">{vehicle.vehicle_models?.name || '-'}</td>
+                                    <td className="px-5 py-4">{vehicle.vehicle_categories?.name || '-'}</td>
                                     <td className="px-5 py-4">{vehicle.colors?.name || '-'}</td>
                                     <td className="px-5 py-4">{vehicle.engines?.name || '-'}</td>
-                                    <td className="px-5 py-4">{vehicle.transmissions?.name || '-'}</td>
+
                                     <td className="px-5 py-4">
                                         {vehicle.manufacture_year || '-'}
                                         {vehicle.model_year ? `/${vehicle.model_year}` : ''}
@@ -1324,12 +1532,21 @@ export default function VeiculosPage() {
                                     <td className="px-5 py-4">
                                         {vehicle.km ? `${vehicle.km.toLocaleString('pt-BR')} km` : '-'}
                                     </td>
-                                    <td className="px-5 py-4">
-                                        {formatCurrency(Number(vehicle.purchase_price || 0))}
-                                    </td>
+
                                     <td className="px-5 py-4">
                                         {formatCurrency(Number(vehicle.advertised_price || 0))}
                                     </td>
+                                    <td className="px-5 py-4">
+                                        <span
+                                            className={`rounded-full px-3 py-1 text-xs font-bold ${vehicle.is_published
+                                                ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200'
+                                                : 'bg-zinc-100 text-zinc-600 ring-1 ring-zinc-200'
+                                                }`}
+                                        >
+                                            {vehicle.is_published ? 'Publicado' : 'Não publicado'}
+                                        </span>
+                                    </td>
+
                                     <td className="px-5 py-4">
                                         <span
                                             className={`rounded-full px-3 py-1 text-xs font-semibold ${getStatusClass(
@@ -1372,7 +1589,7 @@ export default function VeiculosPage() {
                             {filteredVehicles.length === 0 && (
                                 <tr>
                                     <td
-                                        colSpan={12}
+                                        colSpan={14}
                                         className="px-5 py-10 text-center text-zinc-500"
                                     >
                                         Nenhum veículo cadastrado.
@@ -1404,6 +1621,19 @@ export default function VeiculosPage() {
                 onConfirm={handleDeleteFile}
             />
 
+            <ConfirmDialog
+                open={publishConfirmOpen}
+                title={isPublished ? 'Despublicar veículo' : 'Publicar veículo'}
+                description={
+                    isPublished
+                        ? 'Deseja realmente remover este veículo do site? Ele continuará salvo no sistema.'
+                        : 'Deseja realmente publicar este veículo no site? Ele ficará visível para os visitantes.'
+                }
+                confirmText={isPublished ? 'Despublicar' : 'Publicar'}
+                loading={false}
+                onCancel={() => setPublishConfirmOpen(false)}
+                onConfirm={handleTogglePublished}
+            />
             <Toast
                 open={toast.open}
                 type={toast.type}

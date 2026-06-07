@@ -22,6 +22,7 @@ type VehicleDashboard = {
   purchase_price: number
   advertised_price: number
   status: string
+  is_published: boolean
   created_at: string
   brands?: { name: string } | null
   vehicle_models?: { name: string } | null
@@ -171,6 +172,7 @@ export default function DashboardPage() {
           purchase_price,
           advertised_price,
           status,
+          is_published,
           created_at,
           brands(name),
           vehicle_models(name),
@@ -179,7 +181,6 @@ export default function DashboardPage() {
         `)
         .order('created_at', { ascending: false })
         .limit(5)
-
       setVehicles((data || []) as unknown as VehicleDashboard[])
     }
 
@@ -197,6 +198,7 @@ export default function DashboardPage() {
       acc.sales += numbers.sales
       acc.profit += numbers.profit
       acc.costs += numbers.costs
+      acc.published += vehicle.is_published ? 1 : 0
 
       return acc
     },
@@ -207,6 +209,7 @@ export default function DashboardPage() {
       sales: 0,
       profit: 0,
       costs: 0,
+      published: 0,
     }
   )
 
@@ -253,11 +256,17 @@ export default function DashboardPage() {
       title="Dashboard"
       description="Visão geral da concessionária Matrix."
     >
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
         <KpiCard
           title="Veículos em Estoque"
           value={String(totals.stock)}
           icon={<Car className="text-blue-600" />}
+        />
+
+        <KpiCard
+          title="Publicados no Site"
+          value={String(totals.published)}
+          icon={<Car className="text-emerald-600" />}
         />
 
         <KpiCard
@@ -490,6 +499,7 @@ export default function DashboardPage() {
               <th className="px-5 py-4 text-left">Veículo</th>
               <th className="px-5 py-4 text-left">Compra</th>
               <th className="px-5 py-4 text-left">Anunciado</th>
+              <th className="px-5 py-4 text-left">Site</th>
               <th className="px-5 py-4 text-left">Status</th>
               <th className="px-5 py-4 text-right">Ação</th>
             </tr>
@@ -511,6 +521,17 @@ export default function DashboardPage() {
 
                 <td className="px-5 py-4">
                   {formatCurrency(Number(vehicle.advertised_price || 0))}
+                </td>
+
+                <td className="px-5 py-4">
+                  <span
+                    className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${vehicle.is_published
+                      ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                      : 'border-zinc-200 bg-zinc-50 text-zinc-600'
+                      }`}
+                  >
+                    {vehicle.is_published ? 'Publicado' : 'Não publicado'}
+                  </span>
                 </td>
 
                 <td className="px-5 py-4">
@@ -537,7 +558,7 @@ export default function DashboardPage() {
             {latestVehicles.length === 0 && (
               <tr>
                 <td
-                  colSpan={6}
+                  colSpan={7}
                   className="px-5 py-10 text-center text-zinc-500"
                 >
                   Nenhum veículo cadastrado.

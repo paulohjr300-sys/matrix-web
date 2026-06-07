@@ -12,6 +12,7 @@ import {
   Settings,
   Calculator,
   LogOut,
+  UserRound,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 
@@ -22,6 +23,12 @@ const menus = [
     label: 'Dashboard',
     href: '/dashboard',
     icon: LayoutDashboard,
+    roles: ['ADMIN', 'GERENTE', 'VENDEDOR'],
+  },
+  {
+    label: 'Leads',
+    href: '/leads',
+    icon: UserRound,
     roles: ['ADMIN', 'GERENTE', 'VENDEDOR'],
   },
   {
@@ -85,13 +92,13 @@ export function AppSidebar() {
         .single()
 
       setRole(data?.role || null)
+
       if (data?.role) {
         setRole(data.role)
         localStorage.setItem('matrix_role', data.role)
         localStorage.setItem('matrix_name', data.name)
       }
     }
-
 
     loadProfile()
   }, [])
@@ -100,7 +107,6 @@ export function AppSidebar() {
     localStorage.removeItem('matrix_role')
     await supabase.auth.signOut()
     router.push('/login')
-
   }
 
   const visibleMenus = menus.filter((menu) =>
@@ -123,15 +129,16 @@ export function AppSidebar() {
       <nav className="space-y-2">
         {visibleMenus.map((menu) => {
           const Icon = menu.icon
-          const active = pathname === menu.href
+          const active =
+            pathname === menu.href || pathname.startsWith(`${menu.href}/`)
 
           return (
             <Link
               key={menu.href}
               href={menu.href}
               className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition ${active
-                ? 'bg-red-600 text-white'
-                : 'text-zinc-300 hover:bg-zinc-800 hover:text-white'
+                  ? 'bg-red-600 text-white'
+                  : 'text-zinc-300 hover:bg-zinc-800 hover:text-white'
                 }`}
             >
               <Icon size={20} />
