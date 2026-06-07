@@ -76,6 +76,12 @@ const items = [
         icon: ImageIcon,
     },
     {
+        title: 'Categorias da home',
+        description: 'Gerencie os cards de categorias exibidos na home do site.',
+        href: '/configuracoes/categorias-home',
+        icon: ImageIcon,
+    },
+    {
         title: 'Usuários',
         description: 'Gerencie usuários, perfis e permissões do sistema.',
         href: '/configuracoes/usuarios',
