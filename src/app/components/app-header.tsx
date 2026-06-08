@@ -37,6 +37,7 @@ export function AppHeader({ title, description }: AppHeaderProps) {
     })
 
     const [notifications, setNotifications] = useState<NotificationItem[]>([])
+    const [bellAttention, setBellAttention] = useState(false)
 
     async function loadNotifications() {
         const [
@@ -142,6 +143,7 @@ export function AppHeader({ title, description }: AppHeaderProps) {
             await loadNotifications()
         }
 
+
         void loadNotificationsAsync()
 
         const interval = window.setInterval(() => {
@@ -149,6 +151,32 @@ export function AppHeader({ title, description }: AppHeaderProps) {
         }, 30000)
 
         return () => window.clearInterval(interval)
+    }, [])
+    useEffect(() => {
+        const channel = supabase
+            .channel('realtime-leads-notifications')
+            .on(
+                'postgres_changes',
+                {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'leads',
+                },
+                () => {
+                    void loadNotifications()
+
+                    setBellAttention(true)
+
+                    setTimeout(() => {
+                        setBellAttention(false)
+                    }, 8000)
+                }
+            )
+            .subscribe()
+
+        return () => {
+            void supabase.removeChannel(channel)
+        }
     }, [])
 
     const totalNotifications = useMemo(() => {
@@ -180,9 +208,15 @@ export function AppHeader({ title, description }: AppHeaderProps) {
                         <button
                             type="button"
                             onClick={() => setDropdownOpen((current) => !current)}
-                            className="relative rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:bg-zinc-50"
+                            className={`relative rounded-2xl border p-3 shadow-sm transition-all duration-300 hover:-translate-y-0.5 ${bellAttention
+                                    ? 'border-red-200 bg-red-50 text-red-600 ring-4 ring-red-500/20'
+                                    : 'border-zinc-200 bg-white hover:bg-zinc-50'
+                                }`} 
                         >
-                            <Bell size={20} />
+                            <Bell
+                                size={20}
+                                className={bellAttention ? 'text-red-600' : ''}
+                            />
 
                             {totalNotifications > 0 && (
                                 <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">

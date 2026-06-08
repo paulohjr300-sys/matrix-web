@@ -686,564 +686,695 @@ export default function VeiculosPage() {
             await uploadPendingFiles(data.id)
         }
 
-        showToast('success', 'Veículo cadastrado', 'O veículo foi cadastrado com sucesso.')
+        showToast(
+            'success',
+            'Veículo cadastrado',
+            'O veículo foi cadastrado. A tela continuará aberta para ajustar fotos e definir a principal.'
+        )
 
-        resetForm()
-        setShowForm(false)
-        setLoading(false)
+        setEditingVehicleId(data.id)
         await loadVehicles()
+        await loadVehicleFiles(data.id)
+        setPendingFiles([])
+        setLoading(false)
+        return
     }
-
 
     function handleEditVehicle(vehicle: Vehicle) {
-        setEditingVehicleId(vehicle.id)
-        setPlate(vehicle.plate)
-        setBrandId(vehicle.brand_id || '')
-        setCategoryId(vehicle.category_id || '')
-        setModelId(vehicle.model_id || '')
-        setEngineId(vehicle.engine_id || '')
-        setTransmissionId(vehicle.transmission_id || '')
-        setFuelId(vehicle.fuel_id || '')
-        setColorId(vehicle.color_id || '')
-        setManufactureYear(vehicle.manufacture_year ? String(vehicle.manufacture_year) : '')
-        setModelYear(vehicle.model_year ? String(vehicle.model_year) : '')
-        setKm(vehicle.km ? String(vehicle.km) : '')
-        setPurchasePrice(formatCurrency(Number(vehicle.purchase_price || 0)))
-        setAdvertisedPrice(formatCurrency(Number(vehicle.advertised_price || 0)))
-        setChassi(vehicle.chassi || '')
-        setRenavam(vehicle.renavam || '')
-        setNotes(vehicle.notes || '')
-        setStatus(vehicle.status)
-        setPendingFiles([])
-        setShowForm(true)
-        setIsPublished(vehicle.is_published || false)
-        setMainPhotoFileId(vehicle.main_photo_file_id || null)
-        void loadVehicleFiles(vehicle.id)
-    }
+            setEditingVehicleId(vehicle.id)
+            setPlate(vehicle.plate)
+            setBrandId(vehicle.brand_id || '')
+            setCategoryId(vehicle.category_id || '')
+            setModelId(vehicle.model_id || '')
+            setEngineId(vehicle.engine_id || '')
+            setTransmissionId(vehicle.transmission_id || '')
+            setFuelId(vehicle.fuel_id || '')
+            setColorId(vehicle.color_id || '')
+            setManufactureYear(vehicle.manufacture_year ? String(vehicle.manufacture_year) : '')
+            setModelYear(vehicle.model_year ? String(vehicle.model_year) : '')
+            setKm(vehicle.km ? String(vehicle.km) : '')
+            setPurchasePrice(formatCurrency(Number(vehicle.purchase_price || 0)))
+            setAdvertisedPrice(formatCurrency(Number(vehicle.advertised_price || 0)))
+            setChassi(vehicle.chassi || '')
+            setRenavam(vehicle.renavam || '')
+            setNotes(vehicle.notes || '')
+            setStatus(vehicle.status)
+            setPendingFiles([])
+            setShowForm(true)
+            setIsPublished(vehicle.is_published || false)
+            setMainPhotoFileId(vehicle.main_photo_file_id || null)
+            void loadVehicleFiles(vehicle.id)
+        }
 
-    async function handleDeleteVehicle() {
-        if (!deleteVehicleId) return
+        async function handleDeleteVehicle() {
+            if (!deleteVehicleId) return
 
-        setDeleteLoading(true)
+            setDeleteLoading(true)
 
-        const { error } = await supabase
-            .from('vehicles')
-            .delete()
-            .eq('id', deleteVehicleId)
+            const { error } = await supabase
+                .from('vehicles')
+                .delete()
+                .eq('id', deleteVehicleId)
 
-        if (error) {
-            showToast('error', 'Erro', 'Não foi possível excluir o veículo.')
+            if (error) {
+                showToast('error', 'Erro', 'Não foi possível excluir o veículo.')
+                setDeleteLoading(false)
+                return
+            }
+
+            showToast('success', 'Veículo excluído', 'O veículo foi removido com sucesso.')
+            setDeleteVehicleId(null)
             setDeleteLoading(false)
-            return
+            await loadVehicles()
         }
 
-        showToast('success', 'Veículo excluído', 'O veículo foi removido com sucesso.')
-        setDeleteVehicleId(null)
-        setDeleteLoading(false)
-        await loadVehicles()
-    }
+        async function handleDeleteFile() {
+            if (!deleteFile) return
 
-    async function handleDeleteFile() {
-        if (!deleteFile) return
+            setDeleteFileLoading(true)
 
-        setDeleteFileLoading(true)
+            const bucket = deleteFile.file_type === 'IMAGE' ? 'vehicle-images' : 'vehicle-documents'
 
-        const bucket = deleteFile.file_type === 'IMAGE' ? 'vehicle-images' : 'vehicle-documents'
+            await supabase.storage.from(bucket).remove([deleteFile.file_path])
 
-        await supabase.storage.from(bucket).remove([deleteFile.file_path])
+            const { error } = await supabase
+                .from('vehicle_files')
+                .delete()
+                .eq('id', deleteFile.id)
 
-        const { error } = await supabase
-            .from('vehicle_files')
-            .delete()
-            .eq('id', deleteFile.id)
+            if (error) {
+                showToast('error', 'Erro', error.message)
+                setDeleteFileLoading(false)
+                return
+            }
 
-        if (error) {
-            showToast('error', 'Erro', error.message)
+            showToast('success', 'Arquivo excluído', 'Arquivo removido com sucesso.')
+            setDeleteFile(null)
             setDeleteFileLoading(false)
-            return
+
+            if (editingVehicleId) {
+                await loadVehicleFiles(editingVehicleId)
+            }
         }
 
-        showToast('success', 'Arquivo excluído', 'Arquivo removido com sucesso.')
-        setDeleteFile(null)
-        setDeleteFileLoading(false)
+        const editingVehicle = editingVehicleId
+            ? vehicles.find((vehicle) => vehicle.id === editingVehicleId)
+            : null
 
-        if (editingVehicleId) {
-            await loadVehicleFiles(editingVehicleId)
-        }
-    }
+        const pendingImages = pendingFiles.filter((file) => file.fileType === 'IMAGE')
+        const pendingDocuments = pendingFiles.filter((file) => file.fileType === 'PDF')
+        const savedImages = vehicleFiles.filter((file) => file.file_type === 'IMAGE')
+        const savedDocuments = vehicleFiles.filter((file) => file.file_type === 'PDF')
 
-    const editingVehicle = editingVehicleId
-        ? vehicles.find((vehicle) => vehicle.id === editingVehicleId)
-        : null
+        async function handleSetMainPhoto(fileId: string) {
+            setMainPhotoFileId(fileId)
 
-    const pendingImages = pendingFiles.filter((file) => file.fileType === 'IMAGE')
-    const pendingDocuments = pendingFiles.filter((file) => file.fileType === 'PDF')
-    const savedImages = vehicleFiles.filter((file) => file.file_type === 'IMAGE')
-    const savedDocuments = vehicleFiles.filter((file) => file.file_type === 'PDF')
+            if (!editingVehicleId) {
+                showToast(
+                    'success',
+                    'Foto principal selecionada',
+                    'Ao salvar o veículo, essa foto será usada como capa no site.'
+                )
+                return
+            }
 
-    async function handleSetMainPhoto(fileId: string) {
-        setMainPhotoFileId(fileId)
+            const { error } = await supabase
+                .from('vehicles')
+                .update({
+                    main_photo_file_id: fileId,
+                })
+                .eq('id', editingVehicleId)
 
-        if (!editingVehicleId) {
+            if (error) {
+                showToast('error', 'Erro', 'Não foi possível definir a foto principal.')
+                return
+            }
+
             showToast(
                 'success',
-                'Foto principal selecionada',
-                'Ao salvar o veículo, essa foto será usada como capa no site.'
+                'Foto principal definida',
+                'Essa foto será usada como capa no site.'
             )
-            return
+
+            await loadVehicles()
         }
 
-        const { error } = await supabase
-            .from('vehicles')
-            .update({
-                main_photo_file_id: fileId,
-            })
-            .eq('id', editingVehicleId)
+        async function handleTogglePublished() {
+            if (status === 'VENDIDO' && !isPublished) {
+                setPublishConfirmOpen(false)
+                showToast(
+                    'error',
+                    'Não é possível publicar',
+                    'Veículos vendidos não podem aparecer no site.'
+                )
+                return
+            }
 
-        if (error) {
-            showToast('error', 'Erro', 'Não foi possível definir a foto principal.')
-            return
-        }
+            const newValue = !isPublished
 
-        showToast(
-            'success',
-            'Foto principal definida',
-            'Essa foto será usada como capa no site.'
-        )
-
-        await loadVehicles()
-    }
-
-    async function handleTogglePublished() {
-        if (status === 'VENDIDO' && !isPublished) {
+            setIsPublished(newValue)
             setPublishConfirmOpen(false)
-            showToast(
-                'error',
-                'Não é possível publicar',
-                'Veículos vendidos não podem aparecer no site.'
-            )
-            return
-        }
 
-        const newValue = !isPublished
+            if (!editingVehicleId) {
+                showToast(
+                    'success',
+                    newValue ? 'Marcado para publicar' : 'Marcado para despublicar',
+                    'A alteração será aplicada quando você salvar o veículo.'
+                )
+                return
+            }
 
-        setIsPublished(newValue)
-        setPublishConfirmOpen(false)
+            const { error } = await supabase
+                .from('vehicles')
+                .update({
+                    is_published: newValue,
+                })
+                .eq('id', editingVehicleId)
 
-        if (!editingVehicleId) {
+            if (error) {
+                setIsPublished(!newValue)
+                showToast('error', 'Erro', 'Não foi possível alterar a publicação.')
+                return
+            }
+
             showToast(
                 'success',
-                newValue ? 'Marcado para publicar' : 'Marcado para despublicar',
-                'A alteração será aplicada quando você salvar o veículo.'
+                newValue ? 'Veículo publicado' : 'Veículo despublicado',
+                newValue
+                    ? 'Este veículo agora aparece no site.'
+                    : 'Este veículo foi removido do site.'
             )
-            return
+
+            await loadVehicles()
         }
+        return (
+            <>
+                <PageContainer
+                    title="Veículos"
+                    description="Controle de veículos da Matrix."
+                    action={
+                        <button
+                            onClick={() => {
+                                setShowForm(!showForm)
+                                resetForm()
+                            }}
+                            className="rounded-2xl bg-red-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-red-600/20 transition-all duration-300 hover:-translate-y-0.5 hover:bg-red-700"
+                        >
+                            {showForm ? 'Fechar formulário' : '+ Novo veículo'}
+                        </button>
+                    }
+                >
+                    {showForm && (
+                        <div className="slide-up rounded-3xl border border-zinc-200 bg-white/90 p-6 shadow-xl shadow-zinc-200/60 backdrop-blur">
+                            <h2 className="text-xl font-bold">
+                                {editingVehicleId ? 'Editar veículo' : 'Cadastrar novo veículo'}
+                            </h2>
 
-        const { error } = await supabase
-            .from('vehicles')
-            .update({
-                is_published: newValue,
-            })
-            .eq('id', editingVehicleId)
-
-        if (error) {
-            setIsPublished(!newValue)
-            showToast('error', 'Erro', 'Não foi possível alterar a publicação.')
-            return
-        }
-
-        showToast(
-            'success',
-            newValue ? 'Veículo publicado' : 'Veículo despublicado',
-            newValue
-                ? 'Este veículo agora aparece no site.'
-                : 'Este veículo foi removido do site.'
-        )
-
-        await loadVehicles()
-    }
-    return (
-        <>
-            <PageContainer
-                title="Veículos"
-                description="Controle de veículos da Matrix."
-                action={
-                    <button
-                        onClick={() => {
-                            setShowForm(!showForm)
-                            resetForm()
-                        }}
-                        className="rounded-2xl bg-red-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-red-600/20 transition-all duration-300 hover:-translate-y-0.5 hover:bg-red-700"
-                    >
-                        {showForm ? 'Fechar formulário' : '+ Novo veículo'}
-                    </button>
-                }
-            >
-                {showForm && (
-                    <div className="slide-up rounded-3xl border border-zinc-200 bg-white/90 p-6 shadow-xl shadow-zinc-200/60 backdrop-blur">
-                        <h2 className="text-xl font-bold">
-                            {editingVehicleId ? 'Editar veículo' : 'Cadastrar novo veículo'}
-                        </h2>
-
-                        <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-3">
-                            <div>
-                                <label className="text-sm font-medium text-zinc-700">Placa</label>
-                                <input
-                                    value={plate}
-                                    onChange={(event) =>
-                                        setPlate(
-                                            event.target.value
-                                                .toUpperCase()
-                                                .replace(/\s/g, '')
-                                                .slice(0, 7)
-                                        )
-                                    }
-                                    placeholder="ABC1D23"
-                                    maxLength={7}
-                                    className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="text-sm font-medium text-zinc-700">Marca</label>
-                                <select
-                                    value={brandId}
-                                    onChange={(event) => handleBrandChange(event.target.value)}
-                                    className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
-                                >
-                                    <option value="">Selecione</option>
-                                    {brands.map((brand) => (
-                                        <option key={brand.id} value={brand.id}>
-                                            {brand.name}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className="text-sm font-medium text-zinc-700">Modelo</label>
-                                <select
-                                    value={modelId}
-                                    onChange={(event) => setModelId(event.target.value)}
-                                    disabled={!brandId}
-                                    className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10 disabled:bg-zinc-100 disabled:text-zinc-400"
-                                >
-                                    <option value="">
-                                        {brandId ? 'Selecione' : 'Selecione uma marca primeiro'}
-                                    </option>
-                                    {filteredModels.map((model) => (
-                                        <option key={model.id} value={model.id}>
-                                            {model.name}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-
-
-                            <div>
-                                <label className="text-sm font-medium text-zinc-700">Categoria</label>
-                                <select
-                                    value={categoryId}
-                                    onChange={(event) => setCategoryId(event.target.value)}
-                                    className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
-                                >
-                                    <option value="">Selecione</option>
-                                    {categories.map((category) => (
-                                        <option key={category.id} value={category.id}>
-                                            {category.name}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className="text-sm font-medium text-zinc-700">Cor</label>
-                                <select
-                                    value={colorId}
-                                    onChange={(event) => setColorId(event.target.value)}
-                                    className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
-                                >
-                                    <option value="">Selecione</option>
-                                    {colors.map((item) => (
-                                        <option key={item.id} value={item.id}>
-                                            {item.name}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className="text-sm font-medium text-zinc-700">Motor</label>
-                                <select
-                                    value={engineId}
-                                    onChange={(event) => setEngineId(event.target.value)}
-                                    className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
-                                >
-                                    <option value="">Selecione</option>
-                                    {engines.map((item) => (
-                                        <option key={item.id} value={item.id}>
-                                            {item.name}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className="text-sm font-medium text-zinc-700">Câmbio</label>
-                                <select
-                                    value={transmissionId}
-                                    onChange={(event) => setTransmissionId(event.target.value)}
-                                    className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
-                                >
-                                    <option value="">Selecione</option>
-                                    {transmissions.map((item) => (
-                                        <option key={item.id} value={item.id}>
-                                            {item.name}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className="text-sm font-medium text-zinc-700">
-                                    Combustível
-                                </label>
-                                <select
-                                    value={fuelId}
-                                    onChange={(event) => setFuelId(event.target.value)}
-                                    className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
-                                >
-                                    <option value="">Selecione</option>
-                                    {fuels.map((item) => (
-                                        <option key={item.id} value={item.id}>
-                                            {item.name}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className="text-sm font-medium text-zinc-700">
-                                    Ano fabricação
-                                </label>
-                                <input
-                                    type="number"
-                                    value={manufactureYear}
-                                    onChange={(event) => setManufactureYear(event.target.value)}
-                                    placeholder="2020"
-                                    className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="text-sm font-medium text-zinc-700">
-                                    Ano modelo
-                                </label>
-                                <input
-                                    type="number"
-                                    value={modelYear}
-                                    onChange={(event) => setModelYear(event.target.value)}
-                                    placeholder="2021"
-                                    className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="text-sm font-medium text-zinc-700">KM</label>
-                                <input
-                                    type="number"
-                                    value={km}
-                                    onChange={(event) => setKm(event.target.value)}
-                                    placeholder="45000"
-                                    className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="text-sm font-medium text-zinc-700">Chassi</label>
-                                <input
-                                    value={chassi}
-                                    onChange={(event) => setChassi(formatChassi(event.target.value))}
-                                    placeholder="9BWZZZ377VT004251"
-                                    maxLength={17}
-                                    className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 uppercase outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
-                                />
-                                <p className="mt-1 text-xs text-zinc-400">
-                                    {chassi.length}/17 caracteres
-                                </p>
-                            </div>
-
-                            <div>
-                                <label className="text-sm font-medium text-zinc-700">Renavam</label>
-                                <input
-                                    value={renavam}
-                                    onChange={(event) => setRenavam(formatRenavam(event.target.value))}
-                                    placeholder="12345678901"
-                                    maxLength={11}
-                                    inputMode="numeric"
-                                    className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
-                                />
-                                <p className="mt-1 text-xs text-zinc-400">
-                                    {renavam.length}/11 dígitos
-                                </p>
-                            </div>
-
-                            <div>
-                                <label className="text-sm font-medium text-zinc-700">
-                                    Valor de compra
-                                </label>
-                                <CurrencyInput value={purchasePrice} onChange={setPurchasePrice} />
-                            </div>
-
-                            <div>
-                                <label className="text-sm font-medium text-zinc-700">
-                                    Valor anunciado
-                                </label>
-                                <CurrencyInput
-                                    value={advertisedPrice}
-                                    onChange={setAdvertisedPrice}
-                                />
-                            </div>
-
-                            <div>
-                                <label className="text-sm font-medium text-zinc-700">Status</label>
-                                <select
-                                    value={status}
-                                    onChange={(event) => {
-                                        const newStatus = event.target.value
-
-                                        setStatus(newStatus)
-
-                                        if (newStatus === 'VENDIDO') {
-                                            setIsPublished(false)
-                                        }
-                                    }}
-                                    className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
-                                >
-                                    {statusOptions.map((item) => (
-                                        <option key={item.value} value={item.value}>
-                                            {item.label}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="text-sm font-medium text-zinc-700">
-                                    Publicação no site
-                                </label>
-
-                                <button
-                                    type="button"
-                                    onClick={() => setPublishConfirmOpen(true)}
-                                    className={`mt-2 flex w-full items-center justify-center rounded-xl px-4 py-3 text-sm font-bold shadow-sm transition hover:-translate-y-0.5 ${isPublished
-                                        ? 'bg-emerald-600 text-white hover:bg-emerald-700'
-                                        : 'bg-zinc-950 text-white hover:bg-zinc-800'
-                                        }`}
-                                >
-                                    {isPublished ? 'Publicado no site' : 'Publicar no site'}
-                                </button>
-
-                                <p className="mt-1 text-xs text-zinc-500">
-                                    {isPublished
-                                        ? 'Este veículo aparece no site.'
-                                        : 'Este veículo ainda não aparece no site.'}
-                                </p>
-                            </div>
-                            <div className="md:col-span-3">
-                                <label className="text-sm font-medium text-zinc-700">
-                                    Observações
-                                </label>
-                                <textarea
-                                    value={notes}
-                                    onChange={(event) => setNotes(event.target.value)}
-                                    placeholder="Ex: veículo revisado, manual e chave reserva, IPVA pago..."
-                                    rows={4}
-                                    className="mt-2 w-full resize-none rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="mt-8 rounded-3xl border border-zinc-200 bg-zinc-50 p-5">
-                            <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+                            <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-3">
                                 <div>
-                                    <h3 className="text-lg font-bold text-zinc-950">
-                                        Fotos e documentos
-                                    </h3>
-                                    <p className="mt-1 text-sm text-zinc-500">
-                                        Anexe várias fotos e PDFs de uma vez. As fotos ficam separadas dos documentos.
+                                    <label className="text-sm font-medium text-zinc-700">Placa</label>
+                                    <input
+                                        value={plate}
+                                        onChange={(event) =>
+                                            setPlate(
+                                                event.target.value
+                                                    .toUpperCase()
+                                                    .replace(/\s/g, '')
+                                                    .slice(0, 7)
+                                            )
+                                        }
+                                        placeholder="ABC1D23"
+                                        maxLength={7}
+                                        className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="text-sm font-medium text-zinc-700">Marca</label>
+                                    <select
+                                        value={brandId}
+                                        onChange={(event) => handleBrandChange(event.target.value)}
+                                        className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                                    >
+                                        <option value="">Selecione</option>
+                                        {brands.map((brand) => (
+                                            <option key={brand.id} value={brand.id}>
+                                                {brand.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="text-sm font-medium text-zinc-700">Modelo</label>
+                                    <select
+                                        value={modelId}
+                                        onChange={(event) => setModelId(event.target.value)}
+                                        disabled={!brandId}
+                                        className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10 disabled:bg-zinc-100 disabled:text-zinc-400"
+                                    >
+                                        <option value="">
+                                            {brandId ? 'Selecione' : 'Selecione uma marca primeiro'}
+                                        </option>
+                                        {filteredModels.map((model) => (
+                                            <option key={model.id} value={model.id}>
+                                                {model.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+
+                                <div>
+                                    <label className="text-sm font-medium text-zinc-700">Categoria</label>
+                                    <select
+                                        value={categoryId}
+                                        onChange={(event) => setCategoryId(event.target.value)}
+                                        className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                                    >
+                                        <option value="">Selecione</option>
+                                        {categories.map((category) => (
+                                            <option key={category.id} value={category.id}>
+                                                {category.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="text-sm font-medium text-zinc-700">Cor</label>
+                                    <select
+                                        value={colorId}
+                                        onChange={(event) => setColorId(event.target.value)}
+                                        className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                                    >
+                                        <option value="">Selecione</option>
+                                        {colors.map((item) => (
+                                            <option key={item.id} value={item.id}>
+                                                {item.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="text-sm font-medium text-zinc-700">Motor</label>
+                                    <select
+                                        value={engineId}
+                                        onChange={(event) => setEngineId(event.target.value)}
+                                        className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                                    >
+                                        <option value="">Selecione</option>
+                                        {engines.map((item) => (
+                                            <option key={item.id} value={item.id}>
+                                                {item.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="text-sm font-medium text-zinc-700">Câmbio</label>
+                                    <select
+                                        value={transmissionId}
+                                        onChange={(event) => setTransmissionId(event.target.value)}
+                                        className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                                    >
+                                        <option value="">Selecione</option>
+                                        {transmissions.map((item) => (
+                                            <option key={item.id} value={item.id}>
+                                                {item.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="text-sm font-medium text-zinc-700">
+                                        Combustível
+                                    </label>
+                                    <select
+                                        value={fuelId}
+                                        onChange={(event) => setFuelId(event.target.value)}
+                                        className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                                    >
+                                        <option value="">Selecione</option>
+                                        {fuels.map((item) => (
+                                            <option key={item.id} value={item.id}>
+                                                {item.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="text-sm font-medium text-zinc-700">
+                                        Ano fabricação
+                                    </label>
+                                    <input
+                                        type="number"
+                                        value={manufactureYear}
+                                        onChange={(event) => setManufactureYear(event.target.value)}
+                                        placeholder="2020"
+                                        className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="text-sm font-medium text-zinc-700">
+                                        Ano modelo
+                                    </label>
+                                    <input
+                                        type="number"
+                                        value={modelYear}
+                                        onChange={(event) => setModelYear(event.target.value)}
+                                        placeholder="2021"
+                                        className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="text-sm font-medium text-zinc-700">KM</label>
+                                    <input
+                                        type="number"
+                                        value={km}
+                                        onChange={(event) => setKm(event.target.value)}
+                                        placeholder="45000"
+                                        className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="text-sm font-medium text-zinc-700">Chassi</label>
+                                    <input
+                                        value={chassi}
+                                        onChange={(event) => setChassi(formatChassi(event.target.value))}
+                                        placeholder="9BWZZZ377VT004251"
+                                        maxLength={17}
+                                        className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 uppercase outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                                    />
+                                    <p className="mt-1 text-xs text-zinc-400">
+                                        {chassi.length}/17 caracteres
                                     </p>
+                                </div>
+
+                                <div>
+                                    <label className="text-sm font-medium text-zinc-700">Renavam</label>
+                                    <input
+                                        value={renavam}
+                                        onChange={(event) => setRenavam(formatRenavam(event.target.value))}
+                                        placeholder="12345678901"
+                                        maxLength={11}
+                                        inputMode="numeric"
+                                        className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                                    />
+                                    <p className="mt-1 text-xs text-zinc-400">
+                                        {renavam.length}/11 dígitos
+                                    </p>
+                                </div>
+
+                                <div>
+                                    <label className="text-sm font-medium text-zinc-700">
+                                        Valor de compra
+                                    </label>
+                                    <CurrencyInput value={purchasePrice} onChange={setPurchasePrice} />
+                                </div>
+
+                                <div>
+                                    <label className="text-sm font-medium text-zinc-700">
+                                        Valor anunciado
+                                    </label>
+                                    <CurrencyInput
+                                        value={advertisedPrice}
+                                        onChange={setAdvertisedPrice}
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="text-sm font-medium text-zinc-700">Status</label>
+                                    <select
+                                        value={status}
+                                        onChange={(event) => {
+                                            const newStatus = event.target.value
+
+                                            setStatus(newStatus)
+
+                                            if (newStatus === 'VENDIDO') {
+                                                setIsPublished(false)
+                                            }
+                                        }}
+                                        className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                                    >
+                                        {statusOptions.map((item) => (
+                                            <option key={item.value} value={item.value}>
+                                                {item.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-sm font-medium text-zinc-700">
+                                        Publicação no site
+                                    </label>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => setPublishConfirmOpen(true)}
+                                        className={`mt-2 flex w-full items-center justify-center rounded-xl px-4 py-3 text-sm font-bold shadow-sm transition hover:-translate-y-0.5 ${isPublished
+                                            ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                                            : 'bg-zinc-950 text-white hover:bg-zinc-800'
+                                            }`}
+                                    >
+                                        {isPublished ? 'Publicado no site' : 'Publicar no site'}
+                                    </button>
+
+                                    <p className="mt-1 text-xs text-zinc-500">
+                                        {isPublished
+                                            ? 'Este veículo aparece no site.'
+                                            : 'Este veículo ainda não aparece no site.'}
+                                    </p>
+                                </div>
+                                <div className="md:col-span-3">
+                                    <label className="text-sm font-medium text-zinc-700">
+                                        Observações
+                                    </label>
+                                    <textarea
+                                        value={notes}
+                                        onChange={(event) => setNotes(event.target.value)}
+                                        placeholder="Ex: veículo revisado, manual e chave reserva, IPVA pago..."
+                                        rows={4}
+                                        className="mt-2 w-full resize-none rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                                    />
                                 </div>
                             </div>
 
-                            <div className="mt-5 flex flex-wrap gap-3">
-                                <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-red-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-red-700">
-                                    <Upload size={18} />
-                                    Enviar fotos
-                                    <input
-                                        type="file"
-                                        accept="image/*"
-                                        multiple
-                                        className="hidden"
-                                        disabled={uploading}
-                                        onChange={(event) => {
-                                            const files = Array.from(event.target.files || [])
-                                            event.target.value = ''
-
-                                            files.forEach((file) => {
-                                                handleAddPendingFile(file, 'IMAGE')
-                                            })
-                                        }}
-                                    />
-                                </label>
-
-                                <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-zinc-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-zinc-800">
-                                    <Upload size={18} />
-                                    Enviar PDFs
-                                    <input
-                                        type="file"
-                                        accept="application/pdf"
-                                        multiple
-                                        className="hidden"
-                                        disabled={uploading}
-                                        onChange={(event) => {
-                                            const files = Array.from(event.target.files || [])
-                                            event.target.value = ''
-
-                                            files.forEach((file) => {
-                                                handleAddPendingFile(file, 'PDF')
-                                            })
-                                        }}
-                                    />
-                                </label>
-                            </div>
-
-                            <div className="mt-8">
-                                <div className="mb-4 flex items-center justify-between">
+                            <div className="mt-8 rounded-3xl border border-zinc-200 bg-zinc-50 p-5">
+                                <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
                                     <div>
-                                        <h4 className="text-base font-bold text-zinc-950">Fotos</h4>
-                                        <p className="text-sm text-zinc-500">
-                                            Escolha uma foto salva como principal do veículo.
+                                        <h3 className="text-lg font-bold text-zinc-950">
+                                            Fotos e documentos
+                                        </h3>
+                                        <p className="mt-1 text-sm text-zinc-500">
+                                            Anexe várias fotos e PDFs de uma vez. As fotos ficam separadas dos documentos.
                                         </p>
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-1 gap-4 md:grid-cols-3 xl:grid-cols-4">
-                                    {pendingImages.map((item) => (
-                                        <div
-                                            key={item.localId}
-                                            className="overflow-hidden rounded-2xl border border-amber-200 bg-amber-50"
-                                        >
-                                            <div className="flex h-36 items-center justify-center bg-white text-amber-700">
-                                                <ImageIcon size={32} />
-                                            </div>
+                                <div className="mt-5 flex flex-wrap gap-3">
+                                    <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-red-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-red-700">
+                                        <Upload size={18} />
+                                        Enviar fotos
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            multiple
+                                            className="hidden"
+                                            disabled={uploading}
+                                            onChange={(event) => {
+                                                const files = Array.from(event.target.files || [])
+                                                event.target.value = ''
 
-                                            <div className="p-4">
-                                                <p className="truncate text-sm font-semibold text-zinc-950">
-                                                    {item.file.name}
-                                                </p>
-                                                <p className="mt-1 text-xs text-amber-700">
-                                                    Aguardando salvar · {formatFileSize(item.file.size)}
-                                                </p>
+                                                files.forEach((file) => {
+                                                    handleAddPendingFile(file, 'IMAGE')
+                                                })
+                                            }}
+                                        />
+                                    </label>
+
+                                    <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-zinc-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-zinc-800">
+                                        <Upload size={18} />
+                                        Enviar PDFs
+                                        <input
+                                            type="file"
+                                            accept="application/pdf"
+                                            multiple
+                                            className="hidden"
+                                            disabled={uploading}
+                                            onChange={(event) => {
+                                                const files = Array.from(event.target.files || [])
+                                                event.target.value = ''
+
+                                                files.forEach((file) => {
+                                                    handleAddPendingFile(file, 'PDF')
+                                                })
+                                            }}
+                                        />
+                                    </label>
+                                </div>
+
+                                <div className="mt-8">
+                                    <div className="mb-4 flex items-center justify-between">
+                                        <div>
+                                            <h4 className="text-base font-bold text-zinc-950">Fotos</h4>
+                                            <p className="text-sm text-zinc-500">
+                                                Escolha uma foto salva como principal do veículo.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 gap-4 md:grid-cols-3 xl:grid-cols-4">
+                                        {pendingImages.map((item) => (
+                                            <div
+                                                key={item.localId}
+                                                className="overflow-hidden rounded-2xl border border-amber-200 bg-amber-50"
+                                            >
+                                                <div className="flex h-36 items-center justify-center bg-white text-amber-700">
+                                                    <ImageIcon size={32} />
+                                                </div>
+
+                                                <div className="p-4">
+                                                    <p className="truncate text-sm font-semibold text-zinc-950">
+                                                        {item.file.name}
+                                                    </p>
+                                                    <p className="mt-1 text-xs text-amber-700">
+                                                        Aguardando salvar · {formatFileSize(item.file.size)}
+                                                    </p>
+
+                                                    <button
+                                                        onClick={() =>
+                                                            setPendingFiles((current) =>
+                                                                current.filter((file) => file.localId !== item.localId)
+                                                            )
+                                                        }
+                                                        className="mt-3 inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-xs font-bold text-red-600 transition hover:bg-red-50"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                        Remover
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+
+                                        {savedImages.map((file) => {
+                                            const isMainPhoto = editingVehicle?.main_photo_file_id === file.id
+
+                                            return (
+                                                <div
+                                                    key={file.id}
+                                                    className={`overflow-hidden rounded-2xl border bg-white ${isMainPhoto
+                                                        ? 'border-red-300 ring-2 ring-red-100'
+                                                        : 'border-zinc-200'
+                                                        }`}
+                                                >
+                                                    <a
+                                                        href={getPublicFileUrl(file)}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        className="block"
+                                                    >
+                                                        <img
+                                                            src={getPublicFileUrl(file)}
+                                                            alt={file.file_name}
+                                                            className="h-36 w-full object-cover"
+                                                        />
+                                                    </a>
+
+                                                    <div className="p-4">
+                                                        <div className="flex items-start justify-between gap-2">
+                                                            <div className="min-w-0">
+                                                                <p className="truncate text-sm font-semibold text-zinc-950">
+                                                                    {file.file_name}
+                                                                </p>
+                                                                <p className="mt-1 text-xs text-zinc-500">
+                                                                    Foto · {formatFileSize(file.file_size)}
+                                                                </p>
+                                                            </div>
+
+                                                            {isMainPhoto && (
+                                                                <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-red-50 px-2 py-1 text-[10px] font-bold text-red-600">
+                                                                    <Star size={12} fill="currentColor" />
+                                                                    Principal
+                                                                </span>
+                                                            )}
+                                                        </div>
+
+                                                        <div className="mt-4 flex flex-wrap gap-2">
+                                                            {!isMainPhoto && (
+                                                                <button
+                                                                    onClick={() => void handleSetMainPhoto(file.id)}
+                                                                    className="rounded-xl bg-zinc-950 px-3 py-2 text-xs font-bold text-white transition hover:bg-zinc-800"
+                                                                >
+                                                                    Definir principal
+                                                                </button>
+                                                            )}
+
+                                                            <a
+                                                                href={getPublicFileUrl(file)}
+                                                                target="_blank"
+                                                                rel="noreferrer"
+                                                                className="rounded-xl bg-zinc-100 px-3 py-2 text-xs font-bold text-zinc-700 transition hover:bg-zinc-200"
+                                                            >
+                                                                Abrir
+                                                            </a>
+
+                                                            <button
+                                                                onClick={() => setDeleteFile(file)}
+                                                                className="rounded-xl bg-red-50 p-2 text-red-600 transition hover:bg-red-100"
+                                                            >
+                                                                <Trash2 size={16} />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )
+                                        })}
+
+                                        {pendingImages.length === 0 && savedImages.length === 0 && (
+                                            <div className="rounded-2xl bg-white p-6 text-center text-sm text-zinc-500 md:col-span-3 xl:col-span-4">
+                                                Nenhuma foto anexada para este veículo.
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="mt-8">
+                                    <div className="mb-4">
+                                        <h4 className="text-base font-bold text-zinc-950">Documentos PDF</h4>
+                                        <p className="text-sm text-zinc-500">
+                                            CRLV, nota fiscal, laudo cautelar, contrato e outros documentos.
+                                        </p>
+                                    </div>
+
+                                    <div className="space-y-3">
+                                        {pendingDocuments.map((item) => (
+                                            <div
+                                                key={item.localId}
+                                                className="flex items-center justify-between gap-4 rounded-2xl border border-amber-200 bg-amber-50 p-4"
+                                            >
+                                                <div className="flex min-w-0 items-center gap-3">
+                                                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-amber-700">
+                                                        <FileText size={20} />
+                                                    </div>
+
+                                                    <div className="min-w-0">
+                                                        <p className="truncate text-sm font-semibold text-zinc-950">
+                                                            {item.file.name}
+                                                        </p>
+                                                        <p className="text-xs text-amber-700">
+                                                            Aguardando salvar · {formatFileSize(item.file.size)}
+                                                        </p>
+                                                    </div>
+                                                </div>
 
                                                 <button
                                                     onClick={() =>
@@ -1251,410 +1382,299 @@ export default function VeiculosPage() {
                                                             current.filter((file) => file.localId !== item.localId)
                                                         )
                                                     }
-                                                    className="mt-3 inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-xs font-bold text-red-600 transition hover:bg-red-50"
-                                                >
-                                                    <Trash2 size={16} />
-                                                    Remover
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ))}
-
-                                    {savedImages.map((file) => {
-                                        const isMainPhoto = editingVehicle?.main_photo_file_id === file.id
-
-                                        return (
-                                            <div
-                                                key={file.id}
-                                                className={`overflow-hidden rounded-2xl border bg-white ${isMainPhoto
-                                                    ? 'border-red-300 ring-2 ring-red-100'
-                                                    : 'border-zinc-200'
-                                                    }`}
-                                            >
-                                                <a
-                                                    href={getPublicFileUrl(file)}
-                                                    target="_blank"
-                                                    rel="noreferrer"
-                                                    className="block"
-                                                >
-                                                    <img
-                                                        src={getPublicFileUrl(file)}
-                                                        alt={file.file_name}
-                                                        className="h-36 w-full object-cover"
-                                                    />
-                                                </a>
-
-                                                <div className="p-4">
-                                                    <div className="flex items-start justify-between gap-2">
-                                                        <div className="min-w-0">
-                                                            <p className="truncate text-sm font-semibold text-zinc-950">
-                                                                {file.file_name}
-                                                            </p>
-                                                            <p className="mt-1 text-xs text-zinc-500">
-                                                                Foto · {formatFileSize(file.file_size)}
-                                                            </p>
-                                                        </div>
-
-                                                        {isMainPhoto && (
-                                                            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-red-50 px-2 py-1 text-[10px] font-bold text-red-600">
-                                                                <Star size={12} fill="currentColor" />
-                                                                Principal
-                                                            </span>
-                                                        )}
-                                                    </div>
-
-                                                    <div className="mt-4 flex flex-wrap gap-2">
-                                                        {!isMainPhoto && (
-                                                            <button
-                                                                onClick={() => void handleSetMainPhoto(file.id)}
-                                                                className="rounded-xl bg-zinc-950 px-3 py-2 text-xs font-bold text-white transition hover:bg-zinc-800"
-                                                            >
-                                                                Definir principal
-                                                            </button>
-                                                        )}
-
-                                                        <a
-                                                            href={getPublicFileUrl(file)}
-                                                            target="_blank"
-                                                            rel="noreferrer"
-                                                            className="rounded-xl bg-zinc-100 px-3 py-2 text-xs font-bold text-zinc-700 transition hover:bg-zinc-200"
-                                                        >
-                                                            Abrir
-                                                        </a>
-
-                                                        <button
-                                                            onClick={() => setDeleteFile(file)}
-                                                            className="rounded-xl bg-red-50 p-2 text-red-600 transition hover:bg-red-100"
-                                                        >
-                                                            <Trash2 size={16} />
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )
-                                    })}
-
-                                    {pendingImages.length === 0 && savedImages.length === 0 && (
-                                        <div className="rounded-2xl bg-white p-6 text-center text-sm text-zinc-500 md:col-span-3 xl:col-span-4">
-                                            Nenhuma foto anexada para este veículo.
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-
-                            <div className="mt-8">
-                                <div className="mb-4">
-                                    <h4 className="text-base font-bold text-zinc-950">Documentos PDF</h4>
-                                    <p className="text-sm text-zinc-500">
-                                        CRLV, nota fiscal, laudo cautelar, contrato e outros documentos.
-                                    </p>
-                                </div>
-
-                                <div className="space-y-3">
-                                    {pendingDocuments.map((item) => (
-                                        <div
-                                            key={item.localId}
-                                            className="flex items-center justify-between gap-4 rounded-2xl border border-amber-200 bg-amber-50 p-4"
-                                        >
-                                            <div className="flex min-w-0 items-center gap-3">
-                                                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-amber-700">
-                                                    <FileText size={20} />
-                                                </div>
-
-                                                <div className="min-w-0">
-                                                    <p className="truncate text-sm font-semibold text-zinc-950">
-                                                        {item.file.name}
-                                                    </p>
-                                                    <p className="text-xs text-amber-700">
-                                                        Aguardando salvar · {formatFileSize(item.file.size)}
-                                                    </p>
-                                                </div>
-                                            </div>
-
-                                            <button
-                                                onClick={() =>
-                                                    setPendingFiles((current) =>
-                                                        current.filter((file) => file.localId !== item.localId)
-                                                    )
-                                                }
-                                                className="rounded-xl bg-white p-2 text-red-600 transition hover:bg-red-50"
-                                            >
-                                                <Trash2 size={18} />
-                                            </button>
-                                        </div>
-                                    ))}
-
-                                    {savedDocuments.map((file) => (
-                                        <div
-                                            key={file.id}
-                                            className="flex items-center justify-between gap-4 rounded-2xl border border-zinc-200 bg-white p-4"
-                                        >
-                                            <div className="flex min-w-0 items-center gap-3">
-                                                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-zinc-100 text-zinc-700">
-                                                    <FileText size={20} />
-                                                </div>
-
-                                                <div className="min-w-0">
-                                                    <p className="truncate text-sm font-semibold text-zinc-950">
-                                                        {file.file_name}
-                                                    </p>
-                                                    <p className="text-xs text-zinc-500">
-                                                        PDF · {formatFileSize(file.file_size)}
-                                                    </p>
-                                                </div>
-                                            </div>
-
-                                            <div className="flex shrink-0 gap-2">
-                                                <a
-                                                    href={getPublicFileUrl(file)}
-                                                    target="_blank"
-                                                    rel="noreferrer"
-                                                    className="rounded-xl bg-zinc-100 px-3 py-2 text-xs font-bold text-zinc-700 transition hover:bg-zinc-200"
-                                                >
-                                                    Abrir
-                                                </a>
-
-                                                <button
-                                                    onClick={() => setDeleteFile(file)}
-                                                    className="rounded-xl bg-red-50 p-2 text-red-600 transition hover:bg-red-100"
+                                                    className="rounded-xl bg-white p-2 text-red-600 transition hover:bg-red-50"
                                                 >
                                                     <Trash2 size={18} />
                                                 </button>
                                             </div>
-                                        </div>
-                                    ))}
+                                        ))}
 
-                                    {pendingDocuments.length === 0 && savedDocuments.length === 0 && (
-                                        <div className="rounded-2xl bg-white p-6 text-center text-sm text-zinc-500">
-                                            Nenhum documento PDF anexado para este veículo.
-                                        </div>
-                                    )}
+                                        {savedDocuments.map((file) => (
+                                            <div
+                                                key={file.id}
+                                                className="flex items-center justify-between gap-4 rounded-2xl border border-zinc-200 bg-white p-4"
+                                            >
+                                                <div className="flex min-w-0 items-center gap-3">
+                                                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-zinc-100 text-zinc-700">
+                                                        <FileText size={20} />
+                                                    </div>
+
+                                                    <div className="min-w-0">
+                                                        <p className="truncate text-sm font-semibold text-zinc-950">
+                                                            {file.file_name}
+                                                        </p>
+                                                        <p className="text-xs text-zinc-500">
+                                                            PDF · {formatFileSize(file.file_size)}
+                                                        </p>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex shrink-0 gap-2">
+                                                    <a
+                                                        href={getPublicFileUrl(file)}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        className="rounded-xl bg-zinc-100 px-3 py-2 text-xs font-bold text-zinc-700 transition hover:bg-zinc-200"
+                                                    >
+                                                        Abrir
+                                                    </a>
+
+                                                    <button
+                                                        onClick={() => setDeleteFile(file)}
+                                                        className="rounded-xl bg-red-50 p-2 text-red-600 transition hover:bg-red-100"
+                                                    >
+                                                        <Trash2 size={18} />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+
+                                        {pendingDocuments.length === 0 && savedDocuments.length === 0 && (
+                                            <div className="rounded-2xl bg-white p-6 text-center text-sm text-zinc-500">
+                                                Nenhum documento PDF anexado para este veículo.
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
+
+                            <div className="mt-6 flex flex-wrap gap-3">
+                                <button
+                                    onClick={handleSaveVehicle}
+                                    disabled={loading || uploading}
+                                    className="rounded-xl bg-zinc-950 px-6 py-3 text-sm font-semibold text-white transition-all duration-300 hover:-translate-y-0.5 hover:bg-zinc-800 disabled:opacity-50"
+                                >
+                                    {loading || uploading
+                                        ? 'Salvando...'
+                                        : editingVehicleId
+                                            ? 'Salvar edição'
+                                            : 'Salvar veículo'}
+                                </button>
+
+                                {editingVehicleId && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            resetForm()
+                                            setShowForm(false)
+                                        }}
+                                        className="rounded-xl bg-zinc-100 px-6 py-3 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-200"
+                                    >
+                                        Fechar formulário
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-3">
+                        <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-200/40">
+                            <p className="text-sm text-zinc-500">Publicados no site</p>
+                            <strong className="mt-2 block text-3xl text-emerald-700">
+                                {publishedVehiclesCount}
+                            </strong>
+                        </div>
+                    </div>
+
+                    <div className="mt-6 grid grid-cols-1 gap-4 rounded-3xl border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-200/40 md:grid-cols-4">
+                        <div className="md:col-span-2">
+                            <label className="text-sm font-medium text-zinc-700">
+                                Buscar veículo
+                            </label>
+
+                            <input
+                                value={search}
+                                onChange={(event) => setSearch(event.target.value)}
+                                placeholder="Buscar por placa, marca, modelo, cor, chassi ou renavam..."
+                                className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                            />
                         </div>
 
-                        <button
-                            onClick={handleSaveVehicle}
-                            disabled={loading || uploading}
-                            className="mt-6 rounded-xl bg-zinc-950 px-6 py-3 text-sm font-semibold text-white transition-all duration-300 hover:-translate-y-0.5 hover:bg-zinc-800 disabled:opacity-50"
-                        >
-                            {loading || uploading
-                                ? 'Salvando...'
-                                : editingVehicleId
-                                    ? 'Salvar edição'
-                                    : 'Salvar veículo'}
-                        </button>
-                    </div>
-                )}
+                        <div>
+                            <label className="text-sm font-medium text-zinc-700">Status</label>
 
-                <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-3">
-                    <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-200/40">
-                        <p className="text-sm text-zinc-500">Publicados no site</p>
-                        <strong className="mt-2 block text-3xl text-emerald-700">
-                            {publishedVehiclesCount}
-                        </strong>
-                    </div>
-                </div>
+                            <select
+                                value={statusFilter}
+                                onChange={(event) => setStatusFilter(event.target.value)}
+                                className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                            >
+                                <option value="">Todos</option>
 
-                <div className="mt-6 grid grid-cols-1 gap-4 rounded-3xl border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-200/40 md:grid-cols-4">
-                    <div className="md:col-span-2">
-                        <label className="text-sm font-medium text-zinc-700">
-                            Buscar veículo
-                        </label>
+                                {statusOptions.map((item) => (
+                                    <option key={item.value} value={item.value}>
+                                        {item.label}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
 
-                        <input
-                            value={search}
-                            onChange={(event) => setSearch(event.target.value)}
-                            placeholder="Buscar por placa, marca, modelo, cor, chassi ou renavam..."
-                            className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
-                        />
+                        <div>
+                            <label className="text-sm font-medium text-zinc-700">
+                                Publicação
+                            </label>
+
+                            <select
+                                value={publishedFilter}
+                                onChange={(event) => setPublishedFilter(event.target.value)}
+                                className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                            >
+                                <option value="">Todos</option>
+                                <option value="PUBLICADO">Publicados</option>
+                                <option value="NAO_PUBLICADO">Não publicados</option>
+                            </select>
+                        </div>
                     </div>
 
-                    <div>
-                        <label className="text-sm font-medium text-zinc-700">Status</label>
-
-                        <select
-                            value={statusFilter}
-                            onChange={(event) => setStatusFilter(event.target.value)}
-                            className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
-                        >
-                            <option value="">Todos</option>
-
-                            {statusOptions.map((item) => (
-                                <option key={item.value} value={item.value}>
-                                    {item.label}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-
-                    <div>
-                        <label className="text-sm font-medium text-zinc-700">
-                            Publicação
-                        </label>
-
-                        <select
-                            value={publishedFilter}
-                            onChange={(event) => setPublishedFilter(event.target.value)}
-                            className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
-                        >
-                            <option value="">Todos</option>
-                            <option value="PUBLICADO">Publicados</option>
-                            <option value="NAO_PUBLICADO">Não publicados</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div className="fade-in mt-8 overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-xl shadow-zinc-200/50">
-                    <table className="w-full text-sm">
-                        <thead className="bg-zinc-950 text-white">
-                            <tr>
-                                <th className="px-5 py-4 text-left">Placa</th>
-                                <th className="px-5 py-4 text-left">Marca</th>
-                                <th className="px-5 py-4 text-left">Modelo</th>
-                                <th className="px-5 py-4 text-left">Categoria</th>
-                                <th className="px-5 py-4 text-left">Cor</th>
-                                <th className="px-5 py-4 text-left">Motor</th>
-
-                                <th className="px-5 py-4 text-left">Ano</th>
-                                <th className="px-5 py-4 text-left">KM</th>
-
-                                <th className="px-5 py-4 text-left">Anunciado</th>
-                                <th className="px-5 py-4 text-left">Site</th>
-                                <th className="px-5 py-4 text-left">Status</th>
-                                <th className="px-5 py-4 text-right">Ações</th>
-                            </tr>
-                        </thead>
-
-                        <tbody>
-                            {filteredVehicles.map((vehicle) => (
-                                <tr
-                                    key={vehicle.id}
-                                    className="border-t transition-colors duration-200 hover:bg-zinc-50"
-                                >
-                                    <td className="px-5 py-4 font-semibold">{vehicle.plate}</td>
-                                    <td className="px-5 py-4">{vehicle.brands?.name || '-'}</td>
-                                    <td className="px-5 py-4">{vehicle.vehicle_models?.name || '-'}</td>
-                                    <td className="px-5 py-4">{vehicle.vehicle_categories?.name || '-'}</td>
-                                    <td className="px-5 py-4">{vehicle.colors?.name || '-'}</td>
-                                    <td className="px-5 py-4">{vehicle.engines?.name || '-'}</td>
-
-                                    <td className="px-5 py-4">
-                                        {vehicle.manufacture_year || '-'}
-                                        {vehicle.model_year ? `/${vehicle.model_year}` : ''}
-                                    </td>
-                                    <td className="px-5 py-4">
-                                        {vehicle.km ? `${vehicle.km.toLocaleString('pt-BR')} km` : '-'}
-                                    </td>
-
-                                    <td className="px-5 py-4">
-                                        {formatCurrency(Number(vehicle.advertised_price || 0))}
-                                    </td>
-                                    <td className="px-5 py-4">
-                                        <span
-                                            className={`rounded-full px-3 py-1 text-xs font-bold ${vehicle.is_published
-                                                ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200'
-                                                : 'bg-zinc-100 text-zinc-600 ring-1 ring-zinc-200'
-                                                }`}
-                                        >
-                                            {vehicle.is_published ? 'Publicado' : 'Não publicado'}
-                                        </span>
-                                    </td>
-
-                                    <td className="px-5 py-4">
-                                        <span
-                                            className={`rounded-full px-3 py-1 text-xs font-semibold ${getStatusClass(
-                                                vehicle.status
-                                            )}`}
-                                        >
-                                            {getStatusLabel(vehicle.status)}
-                                        </span>
-                                    </td>
-                                    <td className="px-5 py-4">
-                                        <div className="flex justify-end gap-2">
-                                            <Link
-                                                href={`/veiculos/${vehicle.id}`}
-                                                className="rounded-xl bg-zinc-100 p-2 text-zinc-700 transition hover:bg-zinc-200"
-                                                title="Visualizar"
-                                            >
-                                                <Eye size={18} />
-                                            </Link>
-
-                                            <button
-                                                onClick={() => handleEditVehicle(vehicle)}
-                                                className="rounded-xl bg-zinc-100 p-2 text-zinc-700 transition hover:bg-zinc-200"
-                                                title="Editar"
-                                            >
-                                                <Pencil size={18} />
-                                            </button>
-
-                                            <button
-                                                onClick={() => setDeleteVehicleId(vehicle.id)}
-                                                className="rounded-xl bg-red-50 p-2 text-red-600 transition hover:bg-red-100"
-                                                title="Excluir"
-                                            >
-                                                <Trash2 size={18} />
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
-
-                            {filteredVehicles.length === 0 && (
+                    <div className="fade-in mt-8 overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-xl shadow-zinc-200/50">
+                        <table className="w-full text-sm">
+                            <thead className="bg-zinc-950 text-white">
                                 <tr>
-                                    <td
-                                        colSpan={14}
-                                        className="px-5 py-10 text-center text-zinc-500"
-                                    >
-                                        Nenhum veículo cadastrado.
-                                    </td>
+                                    <th className="px-5 py-4 text-left">Placa</th>
+                                    <th className="px-5 py-4 text-left">Marca</th>
+                                    <th className="px-5 py-4 text-left">Modelo</th>
+                                    <th className="px-5 py-4 text-left">Categoria</th>
+                                    <th className="px-5 py-4 text-left">Cor</th>
+                                    <th className="px-5 py-4 text-left">Motor</th>
+
+                                    <th className="px-5 py-4 text-left">Ano</th>
+                                    <th className="px-5 py-4 text-left">KM</th>
+
+                                    <th className="px-5 py-4 text-left">Anunciado</th>
+                                    <th className="px-5 py-4 text-left">Site</th>
+                                    <th className="px-5 py-4 text-left">Status</th>
+                                    <th className="px-5 py-4 text-right">Ações</th>
                                 </tr>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            </PageContainer>
+                            </thead>
 
-            <ConfirmDialog
-                open={!!deleteVehicleId}
-                title="Excluir veículo"
-                description="Deseja realmente excluir este veículo? Essa ação não poderá ser desfeita."
-                confirmText="Excluir veículo"
-                loading={deleteLoading}
-                onCancel={() => setDeleteVehicleId(null)}
-                onConfirm={handleDeleteVehicle}
-            />
+                            <tbody>
+                                {filteredVehicles.map((vehicle) => (
+                                    <tr
+                                        key={vehicle.id}
+                                        className="border-t transition-colors duration-200 hover:bg-zinc-50"
+                                    >
+                                        <td className="px-5 py-4 font-semibold">{vehicle.plate}</td>
+                                        <td className="px-5 py-4">{vehicle.brands?.name || '-'}</td>
+                                        <td className="px-5 py-4">{vehicle.vehicle_models?.name || '-'}</td>
+                                        <td className="px-5 py-4">{vehicle.vehicle_categories?.name || '-'}</td>
+                                        <td className="px-5 py-4">{vehicle.colors?.name || '-'}</td>
+                                        <td className="px-5 py-4">{vehicle.engines?.name || '-'}</td>
 
-            <ConfirmDialog
-                open={!!deleteFile}
-                title="Excluir arquivo"
-                description="Deseja realmente excluir este arquivo?"
-                confirmText="Excluir arquivo"
-                loading={deleteFileLoading}
-                onCancel={() => setDeleteFile(null)}
-                onConfirm={handleDeleteFile}
-            />
+                                        <td className="px-5 py-4">
+                                            {vehicle.manufacture_year || '-'}
+                                            {vehicle.model_year ? `/${vehicle.model_year}` : ''}
+                                        </td>
+                                        <td className="px-5 py-4">
+                                            {vehicle.km ? `${vehicle.km.toLocaleString('pt-BR')} km` : '-'}
+                                        </td>
 
-            <ConfirmDialog
-                open={publishConfirmOpen}
-                title={isPublished ? 'Despublicar veículo' : 'Publicar veículo'}
-                description={
-                    isPublished
-                        ? 'Deseja realmente remover este veículo do site? Ele continuará salvo no sistema.'
-                        : 'Deseja realmente publicar este veículo no site? Ele ficará visível para os visitantes.'
-                }
-                confirmText={isPublished ? 'Despublicar' : 'Publicar'}
-                loading={false}
-                onCancel={() => setPublishConfirmOpen(false)}
-                onConfirm={handleTogglePublished}
-            />
-            <Toast
-                open={toast.open}
-                type={toast.type}
-                title={toast.title}
-                description={toast.description}
-                onClose={() => setToast((current) => ({ ...current, open: false }))}
-            />
-        </>
-    )
-}
+                                        <td className="px-5 py-4">
+                                            {formatCurrency(Number(vehicle.advertised_price || 0))}
+                                        </td>
+                                        <td className="px-5 py-4">
+                                            <span
+                                                className={`rounded-full px-3 py-1 text-xs font-bold ${vehicle.is_published
+                                                    ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200'
+                                                    : 'bg-zinc-100 text-zinc-600 ring-1 ring-zinc-200'
+                                                    }`}
+                                            >
+                                                {vehicle.is_published ? 'Publicado' : 'Não publicado'}
+                                            </span>
+                                        </td>
+
+                                        <td className="px-5 py-4">
+                                            <span
+                                                className={`rounded-full px-3 py-1 text-xs font-semibold ${getStatusClass(
+                                                    vehicle.status
+                                                )}`}
+                                            >
+                                                {getStatusLabel(vehicle.status)}
+                                            </span>
+                                        </td>
+                                        <td className="px-5 py-4">
+                                            <div className="flex justify-end gap-2">
+                                                <Link
+                                                    href={`/veiculos/${vehicle.id}`}
+                                                    className="rounded-xl bg-zinc-100 p-2 text-zinc-700 transition hover:bg-zinc-200"
+                                                    title="Visualizar"
+                                                >
+                                                    <Eye size={18} />
+                                                </Link>
+
+                                                <button
+                                                    onClick={() => handleEditVehicle(vehicle)}
+                                                    className="rounded-xl bg-zinc-100 p-2 text-zinc-700 transition hover:bg-zinc-200"
+                                                    title="Editar"
+                                                >
+                                                    <Pencil size={18} />
+                                                </button>
+
+                                                <button
+                                                    onClick={() => setDeleteVehicleId(vehicle.id)}
+                                                    className="rounded-xl bg-red-50 p-2 text-red-600 transition hover:bg-red-100"
+                                                    title="Excluir"
+                                                >
+                                                    <Trash2 size={18} />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+
+                                {filteredVehicles.length === 0 && (
+                                    <tr>
+                                        <td
+                                            colSpan={14}
+                                            className="px-5 py-10 text-center text-zinc-500"
+                                        >
+                                            Nenhum veículo cadastrado.
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </PageContainer>
+
+                <ConfirmDialog
+                    open={!!deleteVehicleId}
+                    title="Excluir veículo"
+                    description="Deseja realmente excluir este veículo? Essa ação não poderá ser desfeita."
+                    confirmText="Excluir veículo"
+                    loading={deleteLoading}
+                    onCancel={() => setDeleteVehicleId(null)}
+                    onConfirm={handleDeleteVehicle}
+                />
+
+                <ConfirmDialog
+                    open={!!deleteFile}
+                    title="Excluir arquivo"
+                    description="Deseja realmente excluir este arquivo?"
+                    confirmText="Excluir arquivo"
+                    loading={deleteFileLoading}
+                    onCancel={() => setDeleteFile(null)}
+                    onConfirm={handleDeleteFile}
+                />
+
+                <ConfirmDialog
+                    open={publishConfirmOpen}
+                    title={isPublished ? 'Despublicar veículo' : 'Publicar veículo'}
+                    description={
+                        isPublished
+                            ? 'Deseja realmente remover este veículo do site? Ele continuará salvo no sistema.'
+                            : 'Deseja realmente publicar este veículo no site? Ele ficará visível para os visitantes.'
+                    }
+                    confirmText={isPublished ? 'Despublicar' : 'Publicar'}
+                    loading={false}
+                    onCancel={() => setPublishConfirmOpen(false)}
+                    onConfirm={handleTogglePublished}
+                />
+                <Toast
+                    open={toast.open}
+                    type={toast.type}
+                    title={toast.title}
+                    description={toast.description}
+                    onClose={() => setToast((current) => ({ ...current, open: false }))}
+                />
+            </>
+        )
+    }
