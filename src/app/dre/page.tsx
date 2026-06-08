@@ -32,6 +32,12 @@ type VehicleDre = {
     }[]
 }
 
+const statusOptions = [
+    { label: 'Em estoque', value: 'EM_ESTOQUE' },
+    { label: 'Reservado', value: 'RESERVADO' },
+    { label: 'Vendido', value: 'VENDIDO' },
+]
+
 function formatCurrency(value: number) {
     return value.toLocaleString('pt-BR', {
         style: 'currency',
@@ -68,13 +74,10 @@ function getStatusDot(status: string) {
     switch (status) {
         case 'EM_ESTOQUE':
             return 'bg-blue-500 animate-pulse'
-
         case 'RESERVADO':
             return 'bg-amber-500'
-
         case 'VENDIDO':
             return 'bg-emerald-500'
-
         default:
             return 'bg-zinc-500'
     }
@@ -84,13 +87,10 @@ function getStatusBorder(status: string) {
     switch (status) {
         case 'EM_ESTOQUE':
             return 'border-l-blue-500'
-
         case 'RESERVADO':
             return 'border-l-amber-500'
-
         case 'VENDIDO':
             return 'border-l-emerald-500'
-
         default:
             return 'border-l-zinc-300'
     }
@@ -100,13 +100,10 @@ function getStatusLabel(status: string) {
     switch (status) {
         case 'EM_ESTOQUE':
             return 'Em Estoque'
-
         case 'RESERVADO':
             return 'Reservado'
-
         case 'VENDIDO':
             return 'Vendido'
-
         default:
             return status
     }
@@ -115,9 +112,14 @@ function getStatusLabel(status: string) {
 function DreContent() {
     const [vehicles, setVehicles] = useState<VehicleDre[]>([])
     const [search, setSearch] = useState('')
+    const [statusFilter, setStatusFilter] = useState('')
+
     const searchParams = useSearchParams()
     const vehicleIdFromUrl = searchParams.get('vehicleId')
-    const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(vehicleIdFromUrl)
+    const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(
+        vehicleIdFromUrl
+    )
+
     const [toast, setToast] = useState({
         open: false,
         type: 'success' as 'success' | 'error',
@@ -142,8 +144,6 @@ function DreContent() {
         }, 3000)
     }
 
-
-
     useEffect(() => {
         let isMounted = true
 
@@ -151,18 +151,17 @@ function DreContent() {
             const { data, error } = await supabase
                 .from('vehicles')
                 .select(`
-            id,
-            plate,
-            purchase_price,
-            advertised_price,
-            status,
-            brands(name),
-            vehicle_models(name),
-            vehicle_costs(amount),
-            vehicle_sales(sale_price)
-          `)
+          id,
+          plate,
+          purchase_price,
+          advertised_price,
+          status,
+          brands(name),
+          vehicle_models(name),
+          vehicle_costs(amount),
+          vehicle_sales(sale_price)
+        `)
                 .order('created_at', { ascending: false })
-
 
             if (!isMounted) {
                 return
@@ -173,11 +172,10 @@ function DreContent() {
                 return
             }
 
-
             setVehicles((data || []) as unknown as VehicleDre[])
         }
 
-        loadDre()
+        void loadDre()
 
         return () => {
             isMounted = false
@@ -185,9 +183,17 @@ function DreContent() {
     }, [])
 
     const filteredVehicles = vehicles.filter((vehicle) => {
-        const name = getVehicleName(vehicle)
+        const name = getVehicleName(vehicle).toLowerCase()
 
-        return name.toLowerCase().includes(search.toLowerCase())
+        const matchesSearch = search
+            ? name.includes(search.toLowerCase())
+            : true
+
+        const matchesStatus = statusFilter
+            ? vehicle.status === statusFilter
+            : true
+
+        return matchesSearch && matchesStatus
     })
 
     function getNumbers(vehicle: VehicleDre) {
@@ -206,7 +212,6 @@ function DreContent() {
         )
 
         const profit = sale - investment
-
         const margin = sale > 0 ? (profit / sale) * 100 : 0
 
         return {
@@ -219,18 +224,18 @@ function DreContent() {
         }
     }
 
-    const totals = filteredVehicles.reduce(
+    const totals = vehicles.reduce(
         (acc, vehicle) => {
-            const numbers = getNumbers(vehicle)
+        const numbers = getNumbers(vehicle)
 
-            acc.purchase += numbers.purchase
-            acc.costs += numbers.costs
-            acc.investment += numbers.investment
-            acc.sales += numbers.sale
-            acc.profit += numbers.profit
+        acc.purchase += numbers.purchase
+        acc.costs += numbers.costs
+        acc.investment += numbers.investment
+        acc.sales += numbers.sale
+        acc.profit += numbers.profit
 
-            return acc
-        },
+        return acc
+    },
         {
             purchase: 0,
             costs: 0,
@@ -240,10 +245,8 @@ function DreContent() {
         }
     )
 
-
     return (
         <RouteGuard allowedRoles={['ADMIN', 'GERENTE']}>
-
             <>
                 <PageContainer
                     title="DRE"
@@ -320,17 +323,39 @@ function DreContent() {
                         </div>
                     </div>
 
-                    <div className="mt-8 rounded-3xl border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-200/40">
-                        <label className="text-sm font-medium text-zinc-700">
-                            Buscar veículo
-                        </label>
+                    <div className="mt-8 grid grid-cols-1 gap-4 rounded-3xl border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-200/40 md:grid-cols-3">
+                        <div className="md:col-span-2">
+                            <label className="text-sm font-medium text-zinc-700">
+                                Buscar veículo
+                            </label>
 
-                        <input
-                            value={search}
-                            onChange={(event) => setSearch(event.target.value)}
-                            placeholder="Buscar por placa, marca ou modelo..."
-                            className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
-                        />
+                            <input
+                                value={search}
+                                onChange={(event) => setSearch(event.target.value)}
+                                placeholder="Buscar por placa, marca ou modelo..."
+                                className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="text-sm font-medium text-zinc-700">
+                                Status
+                            </label>
+
+                            <select
+                                value={statusFilter}
+                                onChange={(event) => setStatusFilter(event.target.value)}
+                                className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                            >
+                                <option value="">Todos</option>
+
+                                {statusOptions.map((item) => (
+                                    <option key={item.value} value={item.value}>
+                                        {item.label}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
                     </div>
 
                     <div className="mt-8 space-y-4">
@@ -398,7 +423,11 @@ function DreContent() {
                                                 className="inline-flex items-center gap-2 rounded-2xl bg-zinc-950 px-4 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-zinc-800"
                                             >
                                                 {isOpen ? 'Ocultar DRE' : 'Ver DRE'}
-                                                {isOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                                                {isOpen ? (
+                                                    <ChevronUp size={18} />
+                                                ) : (
+                                                    <ChevronDown size={18} />
+                                                )}
                                             </button>
                                         </div>
                                     </div>
@@ -531,6 +560,7 @@ function DreContent() {
         </RouteGuard>
     )
 }
+
 export default function DrePage() {
     return (
         <Suspense
@@ -542,6 +572,5 @@ export default function DrePage() {
         >
             <DreContent />
         </Suspense>
-
     )
 }

@@ -444,7 +444,7 @@ export default function VeiculosPage() {
                         )
                     },
                     'image/webp',
-                    0.75
+                    0.85
                 )
             }
 
@@ -652,34 +652,48 @@ export default function VeiculosPage() {
 
             if (pendingFiles.length > 0) {
                 await uploadPendingFiles(editingVehicleId)
+            } else {
+                await loadVehicleFiles(editingVehicleId)
             }
 
-            showToast('success', 'Veículo atualizado', 'O veículo foi atualizado com sucesso.')
-        } else {
-            const { data, error } = await supabase
-                .from('vehicles')
-                .insert(vehicleData)
-                .select('id')
-                .single()
+            await loadVehicles()
 
-            if (error) {
-                showToast('error', 'Erro ao cadastrar veículo', error.message)
-                setLoading(false)
-                return
-            }
+            setPendingFiles([])
+            setLoading(false)
 
-            if (data?.id && pendingFiles.length > 0) {
-                await uploadPendingFiles(data.id)
-            }
+            showToast(
+                'success',
+                'Veículo atualizado',
+                'As alterações foram salvas. A tela continua aberta para ajustar fotos e foto principal.'
+            )
 
-            showToast('success', 'Veículo cadastrado', 'O veículo foi cadastrado com sucesso.')
+            return
         }
+
+        const { data, error } = await supabase
+            .from('vehicles')
+            .insert(vehicleData)
+            .select('id')
+            .single()
+
+        if (error) {
+            showToast('error', 'Erro ao cadastrar veículo', error.message)
+            setLoading(false)
+            return
+        }
+
+        if (data?.id && pendingFiles.length > 0) {
+            await uploadPendingFiles(data.id)
+        }
+
+        showToast('success', 'Veículo cadastrado', 'O veículo foi cadastrado com sucesso.')
 
         resetForm()
         setShowForm(false)
         setLoading(false)
         await loadVehicles()
     }
+
 
     function handleEditVehicle(vehicle: Vehicle) {
         setEditingVehicleId(vehicle.id)
