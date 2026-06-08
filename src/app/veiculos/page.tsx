@@ -1534,11 +1534,8 @@ export default function VeiculosPage() {
                                     <th className="px-5 py-4 text-left">Modelo</th>
                                     <th className="px-5 py-4 text-left">Categoria</th>
                                     <th className="px-5 py-4 text-left">Cor</th>
-                                    <th className="px-5 py-4 text-left">Motor</th>
-
                                     <th className="px-5 py-4 text-left">Ano</th>
                                     <th className="px-5 py-4 text-left">KM</th>
-
                                     <th className="px-5 py-4 text-left">Anunciado</th>
                                     <th className="px-5 py-4 text-left">Site</th>
                                     <th className="px-5 py-4 text-left">Status</th>
@@ -1557,8 +1554,6 @@ export default function VeiculosPage() {
                                         <td className="px-5 py-4">{vehicle.vehicle_models?.name || '-'}</td>
                                         <td className="px-5 py-4">{vehicle.vehicle_categories?.name || '-'}</td>
                                         <td className="px-5 py-4">{vehicle.colors?.name || '-'}</td>
-                                        <td className="px-5 py-4">{vehicle.engines?.name || '-'}</td>
-
                                         <td className="px-5 py-4">
                                             {vehicle.manufacture_year || '-'}
                                             {vehicle.model_year ? `/${vehicle.model_year}` : ''}
