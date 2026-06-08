@@ -7,7 +7,7 @@ import { CurrencyInput } from '../components/currency-input'
 import { Toast } from '../components/ui/toast'
 import { ConfirmDialog } from '../components/ui/confirm-dialog'
 import { supabase } from '../../lib/supabase'
-import { Eye, FileText, ImageIcon, Pencil, Star, Trash2, Upload } from 'lucide-react'
+import { Eye, FileText, ImageIcon, Pencil, Star, Trash2, Upload, X } from 'lucide-react'
 
 type Brand = {
     id: string
@@ -377,6 +377,17 @@ export default function VeiculosPage() {
         void loadInitialData()
     }, [])
 
+    useEffect(() => {
+        if (!showForm) return
+
+        const originalOverflow = document.body.style.overflow
+        document.body.style.overflow = 'hidden'
+
+        return () => {
+            document.body.style.overflow = originalOverflow
+        }
+    }, [showForm])
+
     function handleBrandChange(value: string) {
         setBrandId(value)
         setModelId('')
@@ -649,6 +660,39 @@ export default function VeiculosPage() {
                 setLoading(false)
                 return
             }
+            if (status === 'VENDIDO') {
+                const { data: existingSale } = await supabase
+                    .from('vehicle_sales')
+                    .select('id')
+                    .eq('vehicle_id', editingVehicleId)
+                    .maybeSingle()
+
+                const saleData = {
+                    vehicle_id: editingVehicleId,
+                    sale_date: new Date().toISOString().slice(0, 10),
+                    advertised_price: advertisedPrice ? parseCurrency(advertisedPrice) : 0,
+                    sale_price: advertisedPrice ? parseCurrency(advertisedPrice) : 0,
+                    payment_method: 'Não informado',
+                    notes: 'Venda gerada automaticamente ao marcar veículo como vendido.',
+                }
+
+                if (existingSale?.id) {
+                    await supabase
+                        .from('vehicle_sales')
+                        .update(saleData)
+                        .eq('id', existingSale.id)
+                } else {
+                    await supabase
+                        .from('vehicle_sales')
+                        .insert(saleData)
+                }
+            } else {
+                await supabase
+                    .from('vehicle_sales')
+                    .delete()
+                    .eq('vehicle_id', editingVehicleId)
+                    .ilike('notes', '%Venda gerada automaticamente%')
+            }
 
             if (pendingFiles.length > 0) {
                 await uploadPendingFiles(editingVehicleId)
@@ -701,196 +745,218 @@ export default function VeiculosPage() {
     }
 
     function handleEditVehicle(vehicle: Vehicle) {
-            setEditingVehicleId(vehicle.id)
-            setPlate(vehicle.plate)
-            setBrandId(vehicle.brand_id || '')
-            setCategoryId(vehicle.category_id || '')
-            setModelId(vehicle.model_id || '')
-            setEngineId(vehicle.engine_id || '')
-            setTransmissionId(vehicle.transmission_id || '')
-            setFuelId(vehicle.fuel_id || '')
-            setColorId(vehicle.color_id || '')
-            setManufactureYear(vehicle.manufacture_year ? String(vehicle.manufacture_year) : '')
-            setModelYear(vehicle.model_year ? String(vehicle.model_year) : '')
-            setKm(vehicle.km ? String(vehicle.km) : '')
-            setPurchasePrice(formatCurrency(Number(vehicle.purchase_price || 0)))
-            setAdvertisedPrice(formatCurrency(Number(vehicle.advertised_price || 0)))
-            setChassi(vehicle.chassi || '')
-            setRenavam(vehicle.renavam || '')
-            setNotes(vehicle.notes || '')
-            setStatus(vehicle.status)
-            setPendingFiles([])
-            setShowForm(true)
-            setIsPublished(vehicle.is_published || false)
-            setMainPhotoFileId(vehicle.main_photo_file_id || null)
-            void loadVehicleFiles(vehicle.id)
-        }
+        setEditingVehicleId(vehicle.id)
+        setPlate(vehicle.plate)
+        setBrandId(vehicle.brand_id || '')
+        setCategoryId(vehicle.category_id || '')
+        setModelId(vehicle.model_id || '')
+        setEngineId(vehicle.engine_id || '')
+        setTransmissionId(vehicle.transmission_id || '')
+        setFuelId(vehicle.fuel_id || '')
+        setColorId(vehicle.color_id || '')
+        setManufactureYear(vehicle.manufacture_year ? String(vehicle.manufacture_year) : '')
+        setModelYear(vehicle.model_year ? String(vehicle.model_year) : '')
+        setKm(vehicle.km ? String(vehicle.km) : '')
+        setPurchasePrice(formatCurrency(Number(vehicle.purchase_price || 0)))
+        setAdvertisedPrice(formatCurrency(Number(vehicle.advertised_price || 0)))
+        setChassi(vehicle.chassi || '')
+        setRenavam(vehicle.renavam || '')
+        setNotes(vehicle.notes || '')
+        setStatus(vehicle.status)
+        setPendingFiles([])
+        setShowForm(true)
+        setIsPublished(vehicle.is_published || false)
+        setMainPhotoFileId(vehicle.main_photo_file_id || null)
+        void loadVehicleFiles(vehicle.id)
+    }
 
-        async function handleDeleteVehicle() {
-            if (!deleteVehicleId) return
+    async function handleDeleteVehicle() {
+        if (!deleteVehicleId) return
 
-            setDeleteLoading(true)
+        setDeleteLoading(true)
 
-            const { error } = await supabase
-                .from('vehicles')
-                .delete()
-                .eq('id', deleteVehicleId)
+        const { error } = await supabase
+            .from('vehicles')
+            .delete()
+            .eq('id', deleteVehicleId)
 
-            if (error) {
-                showToast('error', 'Erro', 'Não foi possível excluir o veículo.')
-                setDeleteLoading(false)
-                return
-            }
-
-            showToast('success', 'Veículo excluído', 'O veículo foi removido com sucesso.')
-            setDeleteVehicleId(null)
+        if (error) {
+            showToast('error', 'Erro', 'Não foi possível excluir o veículo.')
             setDeleteLoading(false)
-            await loadVehicles()
+            return
         }
 
-        async function handleDeleteFile() {
-            if (!deleteFile) return
+        showToast('success', 'Veículo excluído', 'O veículo foi removido com sucesso.')
+        setDeleteVehicleId(null)
+        setDeleteLoading(false)
+        await loadVehicles()
+    }
 
-            setDeleteFileLoading(true)
+    async function handleDeleteFile() {
+        if (!deleteFile) return
 
-            const bucket = deleteFile.file_type === 'IMAGE' ? 'vehicle-images' : 'vehicle-documents'
+        setDeleteFileLoading(true)
 
-            await supabase.storage.from(bucket).remove([deleteFile.file_path])
+        const bucket = deleteFile.file_type === 'IMAGE' ? 'vehicle-images' : 'vehicle-documents'
 
-            const { error } = await supabase
-                .from('vehicle_files')
-                .delete()
-                .eq('id', deleteFile.id)
+        await supabase.storage.from(bucket).remove([deleteFile.file_path])
 
-            if (error) {
-                showToast('error', 'Erro', error.message)
-                setDeleteFileLoading(false)
-                return
-            }
+        const { error } = await supabase
+            .from('vehicle_files')
+            .delete()
+            .eq('id', deleteFile.id)
 
-            showToast('success', 'Arquivo excluído', 'Arquivo removido com sucesso.')
-            setDeleteFile(null)
+        if (error) {
+            showToast('error', 'Erro', error.message)
             setDeleteFileLoading(false)
-
-            if (editingVehicleId) {
-                await loadVehicleFiles(editingVehicleId)
-            }
+            return
         }
 
-        const editingVehicle = editingVehicleId
-            ? vehicles.find((vehicle) => vehicle.id === editingVehicleId)
-            : null
+        showToast('success', 'Arquivo excluído', 'Arquivo removido com sucesso.')
+        setDeleteFile(null)
+        setDeleteFileLoading(false)
 
-        const pendingImages = pendingFiles.filter((file) => file.fileType === 'IMAGE')
-        const pendingDocuments = pendingFiles.filter((file) => file.fileType === 'PDF')
-        const savedImages = vehicleFiles.filter((file) => file.file_type === 'IMAGE')
-        const savedDocuments = vehicleFiles.filter((file) => file.file_type === 'PDF')
+        if (editingVehicleId) {
+            await loadVehicleFiles(editingVehicleId)
+        }
+    }
 
-        async function handleSetMainPhoto(fileId: string) {
-            setMainPhotoFileId(fileId)
+    const editingVehicle = editingVehicleId
+        ? vehicles.find((vehicle) => vehicle.id === editingVehicleId)
+        : null
 
-            if (!editingVehicleId) {
-                showToast(
-                    'success',
-                    'Foto principal selecionada',
-                    'Ao salvar o veículo, essa foto será usada como capa no site.'
-                )
-                return
-            }
+    const pendingImages = pendingFiles.filter((file) => file.fileType === 'IMAGE')
+    const pendingDocuments = pendingFiles.filter((file) => file.fileType === 'PDF')
+    const savedImages = vehicleFiles.filter((file) => file.file_type === 'IMAGE')
+    const savedDocuments = vehicleFiles.filter((file) => file.file_type === 'PDF')
 
-            const { error } = await supabase
-                .from('vehicles')
-                .update({
-                    main_photo_file_id: fileId,
-                })
-                .eq('id', editingVehicleId)
+    async function handleSetMainPhoto(fileId: string) {
+        setMainPhotoFileId(fileId)
 
-            if (error) {
-                showToast('error', 'Erro', 'Não foi possível definir a foto principal.')
-                return
-            }
-
+        if (!editingVehicleId) {
             showToast(
                 'success',
-                'Foto principal definida',
-                'Essa foto será usada como capa no site.'
+                'Foto principal selecionada',
+                'Ao salvar o veículo, essa foto será usada como capa no site.'
             )
-
-            await loadVehicles()
+            return
         }
 
-        async function handleTogglePublished() {
-            if (status === 'VENDIDO' && !isPublished) {
-                setPublishConfirmOpen(false)
-                showToast(
-                    'error',
-                    'Não é possível publicar',
-                    'Veículos vendidos não podem aparecer no site.'
-                )
-                return
-            }
+        const { error } = await supabase
+            .from('vehicles')
+            .update({
+                main_photo_file_id: fileId,
+            })
+            .eq('id', editingVehicleId)
 
-            const newValue = !isPublished
+        if (error) {
+            showToast('error', 'Erro', 'Não foi possível definir a foto principal.')
+            return
+        }
 
-            setIsPublished(newValue)
+        showToast(
+            'success',
+            'Foto principal definida',
+            'Essa foto será usada como capa no site.'
+        )
+
+        await loadVehicles()
+    }
+
+    async function handleTogglePublished() {
+        if (status === 'VENDIDO' && !isPublished) {
             setPublishConfirmOpen(false)
+            showToast(
+                'error',
+                'Não é possível publicar',
+                'Veículos vendidos não podem aparecer no site.'
+            )
+            return
+        }
 
-            if (!editingVehicleId) {
-                showToast(
-                    'success',
-                    newValue ? 'Marcado para publicar' : 'Marcado para despublicar',
-                    'A alteração será aplicada quando você salvar o veículo.'
-                )
-                return
-            }
+        const newValue = !isPublished
 
-            const { error } = await supabase
-                .from('vehicles')
-                .update({
-                    is_published: newValue,
-                })
-                .eq('id', editingVehicleId)
+        setIsPublished(newValue)
+        setPublishConfirmOpen(false)
 
-            if (error) {
-                setIsPublished(!newValue)
-                showToast('error', 'Erro', 'Não foi possível alterar a publicação.')
-                return
-            }
-
+        if (!editingVehicleId) {
             showToast(
                 'success',
-                newValue ? 'Veículo publicado' : 'Veículo despublicado',
-                newValue
-                    ? 'Este veículo agora aparece no site.'
-                    : 'Este veículo foi removido do site.'
+                newValue ? 'Marcado para publicar' : 'Marcado para despublicar',
+                'A alteração será aplicada quando você salvar o veículo.'
             )
-
-            await loadVehicles()
+            return
         }
-        return (
-            <>
-                <PageContainer
-                    title="Veículos"
-                    description="Controle de veículos da Matrix."
-                    action={
-                        <button
-                            onClick={() => {
-                                setShowForm(!showForm)
-                                resetForm()
-                            }}
-                            className="rounded-2xl bg-red-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-red-600/20 transition-all duration-300 hover:-translate-y-0.5 hover:bg-red-700"
-                        >
-                            {showForm ? 'Fechar formulário' : '+ Novo veículo'}
-                        </button>
-                    }
-                >
-                    {showForm && (
-                        <div className="slide-up rounded-3xl border border-zinc-200 bg-white/90 p-6 shadow-xl shadow-zinc-200/60 backdrop-blur">
-                            <h2 className="text-xl font-bold">
-                                {editingVehicleId ? 'Editar veículo' : 'Cadastrar novo veículo'}
-                            </h2>
 
-                            <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-3">
+        const { error } = await supabase
+            .from('vehicles')
+            .update({
+                is_published: newValue,
+            })
+            .eq('id', editingVehicleId)
+
+        if (error) {
+            setIsPublished(!newValue)
+            showToast('error', 'Erro', 'Não foi possível alterar a publicação.')
+            return
+        }
+
+        showToast(
+            'success',
+            newValue ? 'Veículo publicado' : 'Veículo despublicado',
+            newValue
+                ? 'Este veículo agora aparece no site.'
+                : 'Este veículo foi removido do site.'
+        )
+
+        await loadVehicles()
+    }
+    return (
+        <>
+            <PageContainer
+                title="Veículos"
+                description="Controle de veículos da Matrix."
+                action={
+                    <button
+                        onClick={() => {
+                            setShowForm(!showForm)
+                            resetForm()
+                        }}
+                        className="rounded-2xl bg-red-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-red-600/20 transition-all duration-300 hover:-translate-y-0.5 hover:bg-red-700"
+                    >
+                        {showForm ? 'Fechar formulário' : '+ Novo veículo'}
+                    </button>
+                }
+            >
+                {showForm && (
+                    <div className="fixed inset-0 z-[9999] flex items-start justify-center overflow-y-auto bg-black/60 p-4 backdrop-blur-sm md:p-8">
+                        <div className="slide-up relative z-[10000] my-6 w-full max-w-7xl rounded-3xl border border-zinc-200 bg-white p-6 shadow-2xl">
+                            <div className="sticky top-0 z-10 -mx-6 -mt-6 mb-6 flex items-center justify-between gap-4 rounded-t-3xl border-b border-zinc-200 bg-white/95 px-6 py-5 backdrop-blur">
+                                <div>
+                                    <h2 className="text-xl font-bold text-zinc-950">
+                                        {editingVehicleId ? 'Editar veículo' : 'Cadastrar novo veículo'}
+                                    </h2>
+                                    <p className="mt-1 text-sm text-zinc-500">
+                                        {editingVehicleId
+                                            ? 'Atualize os dados, fotos, documentos e publicação deste veículo.'
+                                            : 'Cadastre o veículo e depois ajuste fotos, documentos e foto principal.'}
+                                    </p>
+                                </div>
+
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        resetForm()
+                                        setShowForm(false)
+                                    }}
+                                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-zinc-100 text-zinc-600 transition hover:bg-zinc-200 hover:text-zinc-950"
+                                    title="Fechar"
+                                >
+                                    <X size={20} />
+                                </button>
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
                                 <div>
                                     <label className="text-sm font-medium text-zinc-700">Placa</label>
                                     <input
@@ -1465,211 +1531,212 @@ export default function VeiculosPage() {
                                 )}
                             </div>
                         </div>
-                    )}
+                    </div>
+                )}
 
-                    <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-3">
-                        <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-200/40">
-                            <p className="text-sm text-zinc-500">Publicados no site</p>
-                            <strong className="mt-2 block text-3xl text-emerald-700">
-                                {publishedVehiclesCount}
-                            </strong>
-                        </div>
+                <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-3">
+                    <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-200/40">
+                        <p className="text-sm text-zinc-500">Publicados no site</p>
+                        <strong className="mt-2 block text-3xl text-emerald-700">
+                            {publishedVehiclesCount}
+                        </strong>
+                    </div>
+                </div>
+
+                <div className="mt-6 grid grid-cols-1 gap-4 rounded-3xl border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-200/40 md:grid-cols-4">
+                    <div className="md:col-span-2">
+                        <label className="text-sm font-medium text-zinc-700">
+                            Buscar veículo
+                        </label>
+
+                        <input
+                            value={search}
+                            onChange={(event) => setSearch(event.target.value)}
+                            placeholder="Buscar por placa, marca, modelo, cor, chassi ou renavam..."
+                            className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                        />
                     </div>
 
-                    <div className="mt-6 grid grid-cols-1 gap-4 rounded-3xl border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-200/40 md:grid-cols-4">
-                        <div className="md:col-span-2">
-                            <label className="text-sm font-medium text-zinc-700">
-                                Buscar veículo
-                            </label>
+                    <div>
+                        <label className="text-sm font-medium text-zinc-700">Status</label>
 
-                            <input
-                                value={search}
-                                onChange={(event) => setSearch(event.target.value)}
-                                placeholder="Buscar por placa, marca, modelo, cor, chassi ou renavam..."
-                                className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
-                            />
-                        </div>
+                        <select
+                            value={statusFilter}
+                            onChange={(event) => setStatusFilter(event.target.value)}
+                            className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                        >
+                            <option value="">Todos</option>
 
-                        <div>
-                            <label className="text-sm font-medium text-zinc-700">Status</label>
-
-                            <select
-                                value={statusFilter}
-                                onChange={(event) => setStatusFilter(event.target.value)}
-                                className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
-                            >
-                                <option value="">Todos</option>
-
-                                {statusOptions.map((item) => (
-                                    <option key={item.value} value={item.value}>
-                                        {item.label}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div>
-                            <label className="text-sm font-medium text-zinc-700">
-                                Publicação
-                            </label>
-
-                            <select
-                                value={publishedFilter}
-                                onChange={(event) => setPublishedFilter(event.target.value)}
-                                className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
-                            >
-                                <option value="">Todos</option>
-                                <option value="PUBLICADO">Publicados</option>
-                                <option value="NAO_PUBLICADO">Não publicados</option>
-                            </select>
-                        </div>
+                            {statusOptions.map((item) => (
+                                <option key={item.value} value={item.value}>
+                                    {item.label}
+                                </option>
+                            ))}
+                        </select>
                     </div>
 
-                    <div className="fade-in mt-8 overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-xl shadow-zinc-200/50">
-                        <table className="w-full text-sm">
-                            <thead className="bg-zinc-950 text-white">
-                                <tr>
-                                    <th className="px-5 py-4 text-left">Placa</th>
-                                    <th className="px-5 py-4 text-left">Marca</th>
-                                    <th className="px-5 py-4 text-left">Modelo</th>
-                                    <th className="px-5 py-4 text-left">Categoria</th>
-                                    <th className="px-5 py-4 text-left">Cor</th>
-                                    <th className="px-5 py-4 text-left">Ano</th>
-                                    <th className="px-5 py-4 text-left">KM</th>
-                                    <th className="px-5 py-4 text-left">Anunciado</th>
-                                    <th className="px-5 py-4 text-left">Site</th>
-                                    <th className="px-5 py-4 text-left">Status</th>
-                                    <th className="px-5 py-4 text-right">Ações</th>
-                                </tr>
-                            </thead>
+                    <div>
+                        <label className="text-sm font-medium text-zinc-700">
+                            Publicação
+                        </label>
 
-                            <tbody>
-                                {filteredVehicles.map((vehicle) => (
-                                    <tr
-                                        key={vehicle.id}
-                                        className="border-t transition-colors duration-200 hover:bg-zinc-50"
-                                    >
-                                        <td className="px-5 py-4 font-semibold">{vehicle.plate}</td>
-                                        <td className="px-5 py-4">{vehicle.brands?.name || '-'}</td>
-                                        <td className="px-5 py-4">{vehicle.vehicle_models?.name || '-'}</td>
-                                        <td className="px-5 py-4">{vehicle.vehicle_categories?.name || '-'}</td>
-                                        <td className="px-5 py-4">{vehicle.colors?.name || '-'}</td>
-                                        <td className="px-5 py-4">
-                                            {vehicle.manufacture_year || '-'}
-                                            {vehicle.model_year ? `/${vehicle.model_year}` : ''}
-                                        </td>
-                                        <td className="px-5 py-4">
-                                            {vehicle.km ? `${vehicle.km.toLocaleString('pt-BR')} km` : '-'}
-                                        </td>
+                        <select
+                            value={publishedFilter}
+                            onChange={(event) => setPublishedFilter(event.target.value)}
+                            className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                        >
+                            <option value="">Todos</option>
+                            <option value="PUBLICADO">Publicados</option>
+                            <option value="NAO_PUBLICADO">Não publicados</option>
+                        </select>
+                    </div>
+                </div>
 
-                                        <td className="px-5 py-4">
-                                            {formatCurrency(Number(vehicle.advertised_price || 0))}
-                                        </td>
-                                        <td className="px-5 py-4">
-                                            <span
-                                                className={`rounded-full px-3 py-1 text-xs font-bold ${vehicle.is_published
-                                                    ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200'
-                                                    : 'bg-zinc-100 text-zinc-600 ring-1 ring-zinc-200'
-                                                    }`}
-                                            >
-                                                {vehicle.is_published ? 'Publicado' : 'Não publicado'}
-                                            </span>
-                                        </td>
+                <div className="fade-in mt-8 overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-xl shadow-zinc-200/50">
+                    <table className="w-full text-sm">
+                        <thead className="bg-zinc-950 text-white">
+                            <tr>
+                                <th className="px-5 py-4 text-left">Placa</th>
+                                <th className="px-5 py-4 text-left">Marca</th>
+                                <th className="px-5 py-4 text-left">Modelo</th>
+                                <th className="px-5 py-4 text-left">Categoria</th>
+                                <th className="px-5 py-4 text-left">Cor</th>
+                                <th className="px-5 py-4 text-left">Ano</th>
+                                <th className="px-5 py-4 text-left">KM</th>
+                                <th className="px-5 py-4 text-left">Anunciado</th>
+                                <th className="px-5 py-4 text-left">Site</th>
+                                <th className="px-5 py-4 text-left">Status</th>
+                                <th className="px-5 py-4 text-right">Ações</th>
+                            </tr>
+                        </thead>
 
-                                        <td className="px-5 py-4">
-                                            <span
-                                                className={`rounded-full px-3 py-1 text-xs font-semibold ${getStatusClass(
-                                                    vehicle.status
-                                                )}`}
-                                            >
-                                                {getStatusLabel(vehicle.status)}
-                                            </span>
-                                        </td>
-                                        <td className="px-5 py-4">
-                                            <div className="flex justify-end gap-2">
-                                                <Link
-                                                    href={`/veiculos/${vehicle.id}`}
-                                                    className="rounded-xl bg-zinc-100 p-2 text-zinc-700 transition hover:bg-zinc-200"
-                                                    title="Visualizar"
-                                                >
-                                                    <Eye size={18} />
-                                                </Link>
+                        <tbody>
+                            {filteredVehicles.map((vehicle) => (
+                                <tr
+                                    key={vehicle.id}
+                                    className="border-t transition-colors duration-200 hover:bg-zinc-50"
+                                >
+                                    <td className="px-5 py-4 font-semibold">{vehicle.plate}</td>
+                                    <td className="px-5 py-4">{vehicle.brands?.name || '-'}</td>
+                                    <td className="px-5 py-4">{vehicle.vehicle_models?.name || '-'}</td>
+                                    <td className="px-5 py-4">{vehicle.vehicle_categories?.name || '-'}</td>
+                                    <td className="px-5 py-4">{vehicle.colors?.name || '-'}</td>
+                                    <td className="px-5 py-4">
+                                        {vehicle.manufacture_year || '-'}
+                                        {vehicle.model_year ? `/${vehicle.model_year}` : ''}
+                                    </td>
+                                    <td className="px-5 py-4">
+                                        {vehicle.km ? `${vehicle.km.toLocaleString('pt-BR')} km` : '-'}
+                                    </td>
 
-                                                <button
-                                                    onClick={() => handleEditVehicle(vehicle)}
-                                                    className="rounded-xl bg-zinc-100 p-2 text-zinc-700 transition hover:bg-zinc-200"
-                                                    title="Editar"
-                                                >
-                                                    <Pencil size={18} />
-                                                </button>
-
-                                                <button
-                                                    onClick={() => setDeleteVehicleId(vehicle.id)}
-                                                    className="rounded-xl bg-red-50 p-2 text-red-600 transition hover:bg-red-100"
-                                                    title="Excluir"
-                                                >
-                                                    <Trash2 size={18} />
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-
-                                {filteredVehicles.length === 0 && (
-                                    <tr>
-                                        <td
-                                            colSpan={14}
-                                            className="px-5 py-10 text-center text-zinc-500"
+                                    <td className="px-5 py-4">
+                                        {formatCurrency(Number(vehicle.advertised_price || 0))}
+                                    </td>
+                                    <td className="px-5 py-4">
+                                        <span
+                                            className={`rounded-full px-3 py-1 text-xs font-bold ${vehicle.is_published
+                                                ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200'
+                                                : 'bg-zinc-100 text-zinc-600 ring-1 ring-zinc-200'
+                                                }`}
                                         >
-                                            Nenhum veículo cadastrado.
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                </PageContainer>
+                                            {vehicle.is_published ? 'Publicado' : 'Não publicado'}
+                                        </span>
+                                    </td>
 
-                <ConfirmDialog
-                    open={!!deleteVehicleId}
-                    title="Excluir veículo"
-                    description="Deseja realmente excluir este veículo? Essa ação não poderá ser desfeita."
-                    confirmText="Excluir veículo"
-                    loading={deleteLoading}
-                    onCancel={() => setDeleteVehicleId(null)}
-                    onConfirm={handleDeleteVehicle}
-                />
+                                    <td className="px-5 py-4">
+                                        <span
+                                            className={`rounded-full px-3 py-1 text-xs font-semibold ${getStatusClass(
+                                                vehicle.status
+                                            )}`}
+                                        >
+                                            {getStatusLabel(vehicle.status)}
+                                        </span>
+                                    </td>
+                                    <td className="px-5 py-4">
+                                        <div className="flex justify-end gap-2">
+                                            <Link
+                                                href={`/veiculos/${vehicle.id}`}
+                                                className="rounded-xl bg-zinc-100 p-2 text-zinc-700 transition hover:bg-zinc-200"
+                                                title="Visualizar"
+                                            >
+                                                <Eye size={18} />
+                                            </Link>
 
-                <ConfirmDialog
-                    open={!!deleteFile}
-                    title="Excluir arquivo"
-                    description="Deseja realmente excluir este arquivo?"
-                    confirmText="Excluir arquivo"
-                    loading={deleteFileLoading}
-                    onCancel={() => setDeleteFile(null)}
-                    onConfirm={handleDeleteFile}
-                />
+                                            <button
+                                                onClick={() => handleEditVehicle(vehicle)}
+                                                className="rounded-xl bg-zinc-100 p-2 text-zinc-700 transition hover:bg-zinc-200"
+                                                title="Editar"
+                                            >
+                                                <Pencil size={18} />
+                                            </button>
 
-                <ConfirmDialog
-                    open={publishConfirmOpen}
-                    title={isPublished ? 'Despublicar veículo' : 'Publicar veículo'}
-                    description={
-                        isPublished
-                            ? 'Deseja realmente remover este veículo do site? Ele continuará salvo no sistema.'
-                            : 'Deseja realmente publicar este veículo no site? Ele ficará visível para os visitantes.'
-                    }
-                    confirmText={isPublished ? 'Despublicar' : 'Publicar'}
-                    loading={false}
-                    onCancel={() => setPublishConfirmOpen(false)}
-                    onConfirm={handleTogglePublished}
-                />
-                <Toast
-                    open={toast.open}
-                    type={toast.type}
-                    title={toast.title}
-                    description={toast.description}
-                    onClose={() => setToast((current) => ({ ...current, open: false }))}
-                />
-            </>
-        )
-    }
+                                            <button
+                                                onClick={() => setDeleteVehicleId(vehicle.id)}
+                                                className="rounded-xl bg-red-50 p-2 text-red-600 transition hover:bg-red-100"
+                                                title="Excluir"
+                                            >
+                                                <Trash2 size={18} />
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+
+                            {filteredVehicles.length === 0 && (
+                                <tr>
+                                    <td
+                                        colSpan={14}
+                                        className="px-5 py-10 text-center text-zinc-500"
+                                    >
+                                        Nenhum veículo cadastrado.
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </PageContainer>
+
+            <ConfirmDialog
+                open={!!deleteVehicleId}
+                title="Excluir veículo"
+                description="Deseja realmente excluir este veículo? Essa ação não poderá ser desfeita."
+                confirmText="Excluir veículo"
+                loading={deleteLoading}
+                onCancel={() => setDeleteVehicleId(null)}
+                onConfirm={handleDeleteVehicle}
+            />
+
+            <ConfirmDialog
+                open={!!deleteFile}
+                title="Excluir arquivo"
+                description="Deseja realmente excluir este arquivo?"
+                confirmText="Excluir arquivo"
+                loading={deleteFileLoading}
+                onCancel={() => setDeleteFile(null)}
+                onConfirm={handleDeleteFile}
+            />
+
+            <ConfirmDialog
+                open={publishConfirmOpen}
+                title={isPublished ? 'Despublicar veículo' : 'Publicar veículo'}
+                description={
+                    isPublished
+                        ? 'Deseja realmente remover este veículo do site? Ele continuará salvo no sistema.'
+                        : 'Deseja realmente publicar este veículo no site? Ele ficará visível para os visitantes.'
+                }
+                confirmText={isPublished ? 'Despublicar' : 'Publicar'}
+                loading={false}
+                onCancel={() => setPublishConfirmOpen(false)}
+                onConfirm={handleTogglePublished}
+            />
+            <Toast
+                open={toast.open}
+                type={toast.type}
+                title={toast.title}
+                description={toast.description}
+                onClose={() => setToast((current) => ({ ...current, open: false }))}
+            />
+        </>
+    )
+}

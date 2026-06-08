@@ -103,7 +103,13 @@ export default function LoginPage() {
                     </div>
                 )}
 
-                <div className="space-y-5">
+                <form
+                    className="space-y-5"
+                    onSubmit={(event) => {
+                        event.preventDefault()
+                        void handleLogin()
+                    }}
+                >
                     <div>
                         <label className="text-sm font-medium text-zinc-700">E-mail</label>
                         <input
@@ -127,7 +133,7 @@ export default function LoginPage() {
                     </div>
 
                     <button
-                        onClick={handleLogin}
+                        type="submit"
                         disabled={loading}
                         className="w-full rounded-xl bg-red-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-50"
                     >
@@ -135,12 +141,13 @@ export default function LoginPage() {
                     </button>
 
                     <button
+                        type="button"
                         onClick={handleForgotPassword}
                         className="w-full text-sm font-semibold text-red-600 hover:text-red-700"
                     >
                         Esqueci minha senha
                     </button>
-                </div>
+                </form>
             </div>
         </main>
     )

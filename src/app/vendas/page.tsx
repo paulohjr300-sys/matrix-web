@@ -183,6 +183,7 @@ export default function VendasPage() {
                     .from('vehicles')
                     .update({
                         status: 'VENDIDO',
+                        is_published: false,
                     })
                     .eq('id', vehicleId)
             }

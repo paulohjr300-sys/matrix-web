@@ -114,7 +114,8 @@ function getStatusClass(status: string) {
 }
 
 export default function DashboardPage() {
-  const [vehicles, setVehicles] = useState<VehicleDashboard[]>([])
+  const [allVehicles, setAllVehicles] = useState<VehicleDashboard[]>([])
+  const [latestVehicles, setLatestVehicles] = useState<VehicleDashboard[]>([])
 
   const [toast, setToast] = useState(() => {
     if (typeof window === 'undefined') {
@@ -164,31 +165,42 @@ export default function DashboardPage() {
 
   useEffect(() => {
     async function loadDashboard() {
-      const { data } = await supabase
-        .from('vehicles')
-        .select(`
-          id,
-          plate,
-          purchase_price,
-          advertised_price,
-          status,
-          is_published,
-          created_at,
-          brands(name),
-          vehicle_models(name),
-          vehicle_costs(amount),
-          vehicle_sales(sale_price, sale_date)
-        `)
-        .order('created_at', { ascending: false })
-        .limit(5)
-      setVehicles((data || []) as unknown as VehicleDashboard[])
+      const vehiclesSelect = `
+        id,
+        plate,
+        purchase_price,
+        advertised_price,
+        status,
+        is_published,
+        created_at,
+        brands(name),
+        vehicle_models(name),
+        vehicle_costs!vehicle_costs_vehicle_id_fkey(amount),
+        vehicle_sales!vehicle_sales_vehicle_id_fkey(sale_price, sale_date)
+      `
+
+      const [allVehiclesRes, latestVehiclesRes] = await Promise.all([
+        supabase
+          .from('vehicles')
+          .select(vehiclesSelect)
+          .order('created_at', { ascending: false }),
+
+        supabase
+          .from('vehicles')
+          .select(vehiclesSelect)
+          .order('created_at', { ascending: false })
+          .limit(5),
+      ])
+
+      setAllVehicles((allVehiclesRes.data || []) as unknown as VehicleDashboard[])
+      setLatestVehicles((latestVehiclesRes.data || []) as unknown as VehicleDashboard[])
     }
 
-    loadDashboard()
+    void loadDashboard()
   }, [])
 
 
-  const totals = vehicles.reduce(
+  const totals = allVehicles.reduce(
     (acc, vehicle) => {
       const numbers = getNumbers(vehicle)
 
@@ -213,7 +225,7 @@ export default function DashboardPage() {
     }
   )
 
-  const riskVehicles = vehicles.filter((vehicle) => {
+  const riskVehicles = allVehicles.filter((vehicle) => {
     const numbers = getNumbers(vehicle)
 
     return (
@@ -223,7 +235,7 @@ export default function DashboardPage() {
     )
   })
 
-  const lowMarginVehicles = vehicles.filter((vehicle) => {
+  const lowMarginVehicles = allVehicles.filter((vehicle) => {
     const numbers = getNumbers(vehicle)
 
     return (
@@ -234,11 +246,11 @@ export default function DashboardPage() {
     )
   })
 
-  const stoppedVehicles = vehicles.filter((vehicle) => {
+  const stoppedVehicles = allVehicles.filter((vehicle) => {
     return vehicle.status === 'EM_ESTOQUE' && getDaysInStock(vehicle.created_at) >= 60
   })
 
-  const soldVehicles = vehicles
+  const soldVehicles = allVehicles
     .filter((vehicle) => vehicle.status === 'VENDIDO')
     .map((vehicle) => ({
       ...vehicle,
@@ -248,7 +260,6 @@ export default function DashboardPage() {
 
   const topProfitVehicle = soldVehicles[0]
 
-  const latestVehicles = vehicles.slice(0, 5)
 
 
   return (
