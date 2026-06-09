@@ -1,6 +1,7 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ImageIcon, Pencil, Trash2, Upload } from 'lucide-react'
 import { PageContainer } from '../../components/page-container'
 import { Toast } from '../../components/ui/toast'
@@ -18,6 +19,10 @@ type Banner = {
     is_active: boolean
     sort_order: number
     created_at: string
+    overlay_enabled: boolean | null
+    overlay_from: number | null
+    overlay_middle: number | null
+    overlay_to: number | null
 }
 
 function createFilePath(file: File) {
@@ -27,6 +32,33 @@ function createFilePath(file: File) {
         .replace(/[^a-z0-9.-]/g, '')
 
     return `${Date.now()}-${safeName}`
+}
+
+function clampOverlayValue(value: string) {
+    const number = Number(value || 0)
+
+    if (Number.isNaN(number)) return '0'
+    if (number < 0) return '0'
+    if (number > 100) return '100'
+
+    return String(number)
+}
+
+function getOverlayStyle(
+    overlayEnabled: boolean,
+    overlayFrom: string | number,
+    overlayMiddle: string | number,
+    overlayTo: string | number
+) {
+    if (!overlayEnabled) return undefined
+
+    const from = Number(overlayFrom || 0) / 100
+    const middle = Number(overlayMiddle || 0) / 100
+    const to = Number(overlayTo || 0) / 100
+
+    return {
+        background: `linear-gradient(to right, rgba(0,0,0,${from}), rgba(0,0,0,${middle}), rgba(0,0,0,${to}))`,
+    }
 }
 
 async function compressImage(file: File): Promise<File> {
@@ -92,6 +124,11 @@ export default function BannersPage() {
     const [sortOrder, setSortOrder] = useState('0')
     const [isActive, setIsActive] = useState(true)
 
+    const [overlayEnabled, setOverlayEnabled] = useState(true)
+    const [overlayFrom, setOverlayFrom] = useState('10')
+    const [overlayMiddle, setOverlayMiddle] = useState('10')
+    const [overlayTo, setOverlayTo] = useState('5')
+
     const [desktopImageUrl, setDesktopImageUrl] = useState('')
     const [mobileImageUrl, setMobileImageUrl] = useState('')
 
@@ -108,6 +145,18 @@ export default function BannersPage() {
         title: '',
         description: '',
     })
+
+    const desktopPreviewUrl = useMemo(() => {
+        if (desktopFile) return URL.createObjectURL(desktopFile)
+        return desktopImageUrl
+    }, [desktopFile, desktopImageUrl])
+
+    const mobilePreviewUrl = useMemo(() => {
+        if (mobileFile) return URL.createObjectURL(mobileFile)
+        if (mobileImageUrl) return mobileImageUrl
+        if (desktopFile) return URL.createObjectURL(desktopFile)
+        return desktopImageUrl
+    }, [mobileFile, mobileImageUrl, desktopFile, desktopImageUrl])
 
     function showToast(
         type: 'success' | 'error',
@@ -134,6 +183,10 @@ export default function BannersPage() {
         setButtonLink('')
         setSortOrder('0')
         setIsActive(true)
+        setOverlayEnabled(true)
+        setOverlayFrom('10')
+        setOverlayMiddle('10')
+        setOverlayTo('5')
         setDesktopImageUrl('')
         setMobileImageUrl('')
         setDesktopFile(null)
@@ -156,15 +209,7 @@ export default function BannersPage() {
     }
 
     useEffect(() => {
-        const fetchBanners = async () => {
-            try {
-                await loadBanners()
-            } catch (e) {
-                // handled inside loadBanners
-            }
-        }
-
-        void fetchBanners()
+        void loadBanners()
     }, [])
 
     async function uploadImage(file: File) {
@@ -218,6 +263,10 @@ export default function BannersPage() {
                 mobile_image_url: finalMobileImageUrl || null,
                 is_active: isActive,
                 sort_order: sortOrder ? Number(sortOrder) : 0,
+                overlay_enabled: overlayEnabled,
+                overlay_from: Number(overlayFrom || 0),
+                overlay_middle: Number(overlayMiddle || 0),
+                overlay_to: Number(overlayTo || 0),
             }
 
             if (editingId) {
@@ -267,6 +316,10 @@ export default function BannersPage() {
         setButtonLink(banner.button_link || '')
         setSortOrder(String(banner.sort_order || 0))
         setIsActive(banner.is_active)
+        setOverlayEnabled(banner.overlay_enabled ?? true)
+        setOverlayFrom(String(banner.overlay_from ?? 10))
+        setOverlayMiddle(String(banner.overlay_middle ?? 10))
+        setOverlayTo(String(banner.overlay_to ?? 5))
         setDesktopImageUrl(banner.desktop_image_url)
         setMobileImageUrl(banner.mobile_image_url || '')
         setDesktopFile(null)
@@ -390,12 +443,59 @@ export default function BannersPage() {
                                     type="button"
                                     onClick={() => setIsActive((current) => !current)}
                                     className={`mt-2 w-full rounded-xl px-4 py-3 text-sm font-bold transition ${isActive
-                                            ? 'bg-emerald-600 text-white hover:bg-emerald-700'
-                                            : 'bg-zinc-200 text-zinc-700 hover:bg-zinc-300'
+                                        ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                                        : 'bg-zinc-200 text-zinc-700 hover:bg-zinc-300'
                                         }`}
                                 >
                                     {isActive ? 'Ativo no site' : 'Inativo'}
                                 </button>
+                            </div>
+
+                            <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-5 md:col-span-2">
+                                <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+                                    <div>
+                                        <label className="text-sm font-bold text-zinc-800">
+                                            Sombreamento do banner
+                                        </label>
+                                        <p className="mt-1 text-xs text-zinc-500">
+                                            Controla a sombra sobre a imagem para melhorar a leitura do texto no site.
+                                        </p>
+                                    </div>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => setOverlayEnabled((current) => !current)}
+                                        className={`rounded-xl px-4 py-3 text-sm font-bold transition ${overlayEnabled
+                                            ? 'bg-zinc-950 text-white hover:bg-zinc-800'
+                                            : 'bg-zinc-200 text-zinc-700 hover:bg-zinc-300'
+                                            }`}
+                                    >
+                                        {overlayEnabled ? 'Sombra ativada' : 'Sombra desativada'}
+                                    </button>
+                                </div>
+
+                                <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-3">
+                                    <OverlayControl
+                                        label="Esquerda"
+                                        value={overlayFrom}
+                                        disabled={!overlayEnabled}
+                                        onChange={setOverlayFrom}
+                                    />
+
+                                    <OverlayControl
+                                        label="Meio"
+                                        value={overlayMiddle}
+                                        disabled={!overlayEnabled}
+                                        onChange={setOverlayMiddle}
+                                    />
+
+                                    <OverlayControl
+                                        label="Direita"
+                                        value={overlayTo}
+                                        disabled={!overlayEnabled}
+                                        onChange={setOverlayTo}
+                                    />
+                                </div>
                             </div>
 
                             <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-5">
@@ -426,11 +526,7 @@ export default function BannersPage() {
                                 {(desktopFile || desktopImageUrl) && (
                                     <div className="mt-4 overflow-hidden rounded-xl border border-zinc-200 bg-white">
                                         <img
-                                            src={
-                                                desktopFile
-                                                    ? URL.createObjectURL(desktopFile)
-                                                    : desktopImageUrl
-                                            }
+                                            src={desktopFile ? URL.createObjectURL(desktopFile) : desktopImageUrl}
                                             alt="Prévia desktop"
                                             className="h-40 w-full object-cover"
                                         />
@@ -466,17 +562,25 @@ export default function BannersPage() {
                                 {(mobileFile || mobileImageUrl) && (
                                     <div className="mt-4 overflow-hidden rounded-xl border border-zinc-200 bg-white">
                                         <img
-                                            src={
-                                                mobileFile
-                                                    ? URL.createObjectURL(mobileFile)
-                                                    : mobileImageUrl
-                                            }
+                                            src={mobileFile ? URL.createObjectURL(mobileFile) : mobileImageUrl}
                                             alt="Prévia mobile"
                                             className="h-40 w-full object-cover"
                                         />
                                     </div>
                                 )}
                             </div>
+
+                            <BannerPreview
+                                title={title}
+                                subtitle={subtitle}
+                                buttonText={buttonText}
+                                desktopPreviewUrl={desktopPreviewUrl}
+                                mobilePreviewUrl={mobilePreviewUrl}
+                                overlayEnabled={overlayEnabled}
+                                overlayFrom={overlayFrom}
+                                overlayMiddle={overlayMiddle}
+                                overlayTo={overlayTo}
+                            />
                         </div>
 
                         <button
@@ -502,10 +606,22 @@ export default function BannersPage() {
                                     className="h-full w-full object-cover"
                                 />
 
+                                {banner.overlay_enabled !== false && (
+                                    <div
+                                        className="absolute inset-0"
+                                        style={getOverlayStyle(
+                                            banner.overlay_enabled ?? true,
+                                            banner.overlay_from ?? 10,
+                                            banner.overlay_middle ?? 10,
+                                            banner.overlay_to ?? 5
+                                        )}
+                                    />
+                                )}
+
                                 <span
                                     className={`absolute left-4 top-4 rounded-full px-3 py-1 text-xs font-bold ${banner.is_active
-                                            ? 'bg-emerald-50 text-emerald-700'
-                                            : 'bg-zinc-100 text-zinc-700'
+                                        ? 'bg-emerald-50 text-emerald-700'
+                                        : 'bg-zinc-100 text-zinc-700'
                                         }`}
                                 >
                                     {banner.is_active ? 'Ativo' : 'Inativo'}
@@ -532,6 +648,12 @@ export default function BannersPage() {
                                                 {banner.button_text || 'Botão'} → {banner.button_link || '-'}
                                             </p>
                                         )}
+
+                                        <p className="mt-3 text-xs font-semibold text-zinc-500">
+                                            Sombra: {banner.overlay_enabled === false
+                                                ? 'desativada'
+                                                : `${banner.overlay_from ?? 10}% / ${banner.overlay_middle ?? 10}% / ${banner.overlay_to ?? 5}%`}
+                                        </p>
                                     </div>
 
                                     <div className="flex gap-2">
@@ -589,5 +711,179 @@ export default function BannersPage() {
                 onClose={() => setToast((current) => ({ ...current, open: false }))}
             />
         </>
+    )
+}
+
+function OverlayControl({
+    label,
+    value,
+    disabled,
+    onChange,
+}: {
+    label: string
+    value: string
+    disabled: boolean
+    onChange: (value: string) => void
+}) {
+    return (
+        <div>
+            <label className="text-xs font-bold uppercase tracking-wide text-zinc-500">
+                {label}
+            </label>
+
+            <div className="mt-2 flex items-center gap-3">
+                <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={value}
+                    onChange={(event) => onChange(clampOverlayValue(event.target.value))}
+                    disabled={disabled}
+                    className="w-full"
+                />
+
+                <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={value}
+                    onChange={(event) => onChange(clampOverlayValue(event.target.value))}
+                    disabled={disabled}
+                    className="w-20 rounded-xl border border-zinc-200 px-3 py-2 text-sm outline-none disabled:bg-zinc-100"
+                />
+            </div>
+        </div>
+    )
+}
+
+function BannerPreview({
+    title,
+    subtitle,
+    buttonText,
+    desktopPreviewUrl,
+    mobilePreviewUrl,
+    overlayEnabled,
+    overlayFrom,
+    overlayMiddle,
+    overlayTo,
+}: {
+    title: string
+    subtitle: string
+    buttonText: string
+    desktopPreviewUrl: string
+    mobilePreviewUrl: string
+    overlayEnabled: boolean
+    overlayFrom: string
+    overlayMiddle: string
+    overlayTo: string
+}) {
+    const overlayStyle = getOverlayStyle(
+        overlayEnabled,
+        overlayFrom,
+        overlayMiddle,
+        overlayTo
+    )
+
+    return (
+        <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-5 md:col-span-2">
+            <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+                <div>
+                    <h3 className="text-lg font-black text-zinc-950">Prévia do banner</h3>
+                    <p className="mt-1 text-sm text-zinc-500">
+                        Veja como o texto ficará sobre a imagem no desktop e no celular.
+                    </p>
+                </div>
+
+                <span className="rounded-full bg-zinc-950 px-3 py-1 text-xs font-bold text-white">
+                    Sombra {overlayEnabled ? `${overlayFrom}% / ${overlayMiddle}% / ${overlayTo}%` : 'desativada'}
+                </span>
+            </div>
+
+            <div className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-[1fr_320px]">
+                <div>
+                    <p className="mb-2 text-xs font-bold uppercase tracking-wide text-zinc-500">
+                        Desktop
+                    </p>
+
+                    <div className="relative h-72 overflow-hidden rounded-3xl bg-zinc-950">
+                        {desktopPreviewUrl ? (
+                            <img
+                                src={desktopPreviewUrl}
+                                alt="Prévia desktop do banner"
+                                className="h-full w-full object-cover"
+                            />
+                        ) : (
+                            <div className="flex h-full w-full items-center justify-center bg-zinc-800 text-sm font-bold text-zinc-400">
+                                Envie uma imagem desktop para visualizar
+                            </div>
+                        )}
+
+                        {overlayEnabled && (
+                            <div className="absolute inset-0" style={overlayStyle} />
+                        )}
+
+                        <div className="absolute inset-0 flex items-center p-8">
+                            <div className="max-w-xl text-white">
+                                <h2 className="text-4xl font-black leading-tight">
+                                    {title || 'Título do banner'}
+                                </h2>
+
+                                <p className="mt-4 max-w-lg text-sm leading-6 text-zinc-200">
+                                    {subtitle || 'Prévia da descrição do banner no site público.'}
+                                </p>
+
+                                {buttonText && (
+                                    <span className="mt-5 inline-flex h-11 items-center rounded-xl bg-red-600 px-5 text-xs font-black uppercase tracking-wide text-white">
+                                        {buttonText}
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <p className="mb-2 text-xs font-bold uppercase tracking-wide text-zinc-500">
+                        Mobile
+                    </p>
+
+                    <div className="relative mx-auto h-[420px] max-w-[260px] overflow-hidden rounded-[2rem] bg-zinc-950 shadow-xl">
+                        {mobilePreviewUrl ? (
+                            <img
+                                src={mobilePreviewUrl}
+                                alt="Prévia mobile do banner"
+                                className="h-full w-full object-cover"
+                            />
+                        ) : (
+                            <div className="flex h-full w-full items-center justify-center px-6 text-center text-sm font-bold text-zinc-400">
+                                Envie uma imagem para visualizar
+                            </div>
+                        )}
+
+                        {overlayEnabled && (
+                            <div className="absolute inset-0" style={overlayStyle} />
+                        )}
+
+                        <div className="absolute inset-0 flex items-center p-6">
+                            <div className="text-white">
+                                <h2 className="text-3xl font-black leading-tight">
+                                    {title || 'Título do banner'}
+                                </h2>
+
+                                <p className="mt-4 text-sm leading-6 text-zinc-200">
+                                    {subtitle || 'Prévia da descrição no celular.'}
+                                </p>
+
+                                {buttonText && (
+                                    <span className="mt-5 inline-flex h-11 items-center rounded-xl bg-red-600 px-5 text-xs font-black uppercase tracking-wide text-white">
+                                        {buttonText}
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     )
 }
