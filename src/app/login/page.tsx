@@ -11,16 +11,19 @@ export default function LoginPage() {
     const [password, setPassword] = useState('')
     const [loading, setLoading] = useState(false)
     const [message, setMessage] = useState('')
+    const [messageType, setMessageType] = useState<'success' | 'error'>('error')
 
     async function handleLogin() {
         setMessage('')
 
         if (!email || !password) {
+            setMessageType('error')
             setMessage('Informe e-mail e senha.')
             return
         }
 
         setLoading(true)
+
 
         const { data: loginData, error } = await supabase.auth.signInWithPassword({
             email,
@@ -29,6 +32,7 @@ export default function LoginPage() {
 
         if (error || !loginData.user) {
             setLoading(false)
+            setMessageType('error')
             setMessage('E-mail ou senha inválidos.')
             return
         }
@@ -45,12 +49,14 @@ export default function LoginPage() {
 
 
         if (profileError || !profile) {
+            setMessageType('error')
             setMessage('Não foi possível carregar seu perfil.')
             return
         }
 
         if (profile.is_active === false) {
             await supabase.auth.signOut()
+            setMessageType('error')
             setMessage('Usuário desativado. Procure o administrador.')
             return
         }
@@ -69,6 +75,7 @@ export default function LoginPage() {
         setMessage('')
 
         if (!email) {
+            setMessageType('error')
             setMessage('Informe seu e-mail para recuperar a senha.')
             return
         }
@@ -78,10 +85,12 @@ export default function LoginPage() {
         })
 
         if (error) {
+            setMessageType('error')
             setMessage('Não foi possível enviar o e-mail de recuperação.')
             return
         }
 
+        setMessageType('success')
         setMessage('Enviamos um link de recuperação para seu e-mail.')
     }
 
@@ -98,7 +107,12 @@ export default function LoginPage() {
                 </div>
 
                 {message && (
-                    <div className="mb-5 rounded-2xl bg-red-50 p-4 text-sm font-medium text-red-700">
+                    <div
+                        className={`mb-5 rounded-2xl p-4 text-sm font-medium ${messageType === 'success'
+                                ? 'bg-green-50 text-green-700 border border-green-200'
+                                : 'bg-red-50 text-red-700 border border-red-200'
+                            }`}
+                    >
                         {message}
                     </div>
                 )}
