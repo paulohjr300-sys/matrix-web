@@ -90,6 +90,10 @@ type Vehicle = {
     colors?: { name: string } | null
 }
 
+// Consulta por placa (API Placas): pronta, mas só aparece com
+// NEXT_PUBLIC_CONSULTA_PLACA=true e PLACA_API_TOKEN na Vercel.
+const CONSULTA_PLACA_ATIVA = process.env.NEXT_PUBLIC_CONSULTA_PLACA === 'true'
+
 type VehicleFipe = {
     versao: string
     fipe_codigo: string | null
@@ -1204,7 +1208,7 @@ export default function VeiculosPage() {
                                                 )
                                             }
                                             onKeyDown={(event) => {
-                                                if (event.key === 'Enter') {
+                                                if (event.key === 'Enter' && CONSULTA_PLACA_ATIVA) {
                                                     event.preventDefault()
                                                     void handleBuscarPlaca()
                                                 }
@@ -1213,6 +1217,7 @@ export default function VeiculosPage() {
                                             maxLength={7}
                                             className="min-w-0 flex-1 rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10"
                                         />
+                                        {CONSULTA_PLACA_ATIVA && (
                                         <button
                                             type="button"
                                             onClick={() => void handleBuscarPlaca()}
@@ -1222,6 +1227,7 @@ export default function VeiculosPage() {
                                         >
                                             {buscandoPlaca ? 'Buscando...' : 'Buscar pela placa'}
                                         </button>
+                                        )}
                                     </div>
                                 </div>
 
