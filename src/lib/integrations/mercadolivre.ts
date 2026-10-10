@@ -46,6 +46,31 @@ function key(value: string | null) {
     .toLowerCase();
 }
 
+// O que falta configurar na Vercel (null quando está tudo certo). Mostrado
+// na tela de Integrações para não falhar só na hora de conectar.
+export function mercadoLivreConfigProblem() {
+  const missing: string[] = [];
+
+  if (!process.env.ML_CLIENT_ID) missing.push("ML_CLIENT_ID");
+  if (!process.env.ML_CLIENT_SECRET) missing.push("ML_CLIENT_SECRET");
+  if (!process.env.ML_REDIRECT_URI) missing.push("ML_REDIRECT_URI");
+  if ((process.env.INTEGRATIONS_SECRET || "").length < 32) {
+    missing.push("INTEGRATIONS_SECRET (mínimo de 32 caracteres)");
+  }
+
+  if (missing.length) {
+    return `Configuração incompleta na Vercel: ${missing.join(", ")}.`;
+  }
+
+  const redirect = process.env.ML_REDIRECT_URI!;
+
+  if (!redirect.startsWith("https://") || !redirect.endsWith("/api/integracoes/mercadolivre/callback")) {
+    return "ML_REDIRECT_URI deve ser https://SEU-PAINEL/api/integracoes/mercadolivre/callback.";
+  }
+
+  return null;
+}
+
 export function mercadoLivreConfig() {
   const clientId = process.env.ML_CLIENT_ID;
   const clientSecret = process.env.ML_CLIENT_SECRET;

@@ -21,11 +21,22 @@ export async function GET(request: NextRequest) {
   const fail = (message: string) => finish(`erro=${encodeURIComponent(message)}`);
 
   if (url.searchParams.get("error")) {
-    return fail("A autorização no Mercado Livre foi cancelada.");
+    const detalhe = url.searchParams.get("error_description");
+    return fail(
+      detalhe
+        ? `O Mercado Livre recusou a autorização: ${detalhe}`
+        : "A autorização no Mercado Livre foi cancelada.",
+    );
   }
 
   const code = url.searchParams.get("code");
-  const state = verifyState<{ empresaId: string; userId: string }>(url.searchParams.get("state") || "");
+  let state: { empresaId: string; userId: string } | null = null;
+
+  try {
+    state = verifyState<{ empresaId: string; userId: string }>(url.searchParams.get("state") || "");
+  } catch (error) {
+    console.error("state inválido no retorno do Mercado Livre", error);
+  }
   const verifier = request.cookies.get(PKCE_COOKIE)?.value;
 
   if (!code || !state || !verifier) {
@@ -43,6 +54,7 @@ export async function GET(request: NextRequest) {
     const tokens = await exchangeCode(code, verifier);
     await saveConnection(auth.empresaId, tokens);
   } catch (error) {
+    if (!(error instanceof PortalError)) console.error("Erro ao conectar o Mercado Livre", error);
     return fail(error instanceof PortalError ? error.message : "Não foi possível conectar ao Mercado Livre.");
   }
 

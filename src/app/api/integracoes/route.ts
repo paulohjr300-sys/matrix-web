@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireRole } from "../../../lib/auth-server";
 import { supabaseAdmin } from "../../../lib/supabase-admin";
 import { integrationsAllowed } from "../../../lib/integrations/core";
-import { mercadoLivreConfig } from "../../../lib/integrations/mercadolivre";
+import { mercadoLivreConfigProblem } from "../../../lib/integrations/mercadolivre";
 
 // Situação das integrações da loja (sem nenhum token).
 export async function GET() {
@@ -25,7 +25,9 @@ export async function GET() {
       {
         portal: "mercadolivre",
         nome: "Mercado Livre",
-        disponivel: mercadoLivreConfig() !== null,
+        disponivel: true,
+        // Só o ADMIN precisa ver o que falta configurar.
+        pendencia: auth.role === "ADMIN" ? mercadoLivreConfigProblem() : null,
         conexao: find("mercadolivre"),
       },
       { portal: "webmotors", nome: "Webmotors", disponivel: false, conexao: null },

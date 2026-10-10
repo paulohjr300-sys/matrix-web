@@ -21,6 +21,7 @@ type PortalInfo = {
     portal: 'mercadolivre' | 'webmotors' | 'olx'
     nome: string
     disponivel: boolean
+    pendencia?: string | null
     conexao: Conexao | null
 }
 
@@ -204,7 +205,13 @@ function Integracoes() {
                                         <p className="mt-4 text-sm text-red-700">{item.conexao.ultimo_erro}</p>
                                     )}
 
-                                    {item.disponivel && (
+                                    {item.pendencia && (
+                                        <p className="mt-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-800 ring-1 ring-amber-200">
+                                            {item.pendencia}
+                                        </p>
+                                    )}
+
+                                    {item.disponivel && !item.pendencia && (
                                         <div className="mt-5 flex flex-wrap gap-3">
                                             {(!conectado || comErro) && (
                                                 <a
