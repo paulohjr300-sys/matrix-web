@@ -4,6 +4,10 @@ import { verifyState } from "../../../../../lib/server-crypto";
 import { exchangeCode, saveConnection } from "../../../../../lib/integrations/mercadolivre";
 import { PortalError } from "../../../../../lib/integrations/core";
 
+// Publicar envolve várias chamadas ao Mercado Livre (token, CEP, anúncio,
+// fotos): mais tempo que o limite padrão da função na Vercel.
+export const maxDuration = 60;
+
 const PKCE_COOKIE = "ml_pkce";
 
 // O Mercado Livre devolve o lojista para cá depois da autorização.

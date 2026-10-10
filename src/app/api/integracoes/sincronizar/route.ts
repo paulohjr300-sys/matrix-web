@@ -3,6 +3,10 @@ import { requireRole } from "../../../../lib/auth-server";
 import { PortalError } from "../../../../lib/integrations/core";
 import { syncMercadoLivre } from "../../../../lib/integrations/mercadolivre";
 
+// Publicar envolve várias chamadas ao Mercado Livre (token, CEP, anúncio,
+// fotos): mais tempo que o limite padrão da função na Vercel.
+export const maxDuration = 60;
+
 // Chamado pelo painel depois de salvar um veículo: leva preço, fotos e
 // situação (vendido/reservado) para os anúncios existentes.
 export async function POST(request: Request) {

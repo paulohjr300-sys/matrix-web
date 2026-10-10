@@ -3,6 +3,10 @@ import { requireRole } from "../../../../lib/auth-server";
 import { integrationsAllowed, PortalError } from "../../../../lib/integrations/core";
 import { runMercadoLivre } from "../../../../lib/integrations/mercadolivre";
 
+// Publicar envolve várias chamadas ao Mercado Livre (token, CEP, anúncio,
+// fotos): mais tempo que o limite padrão da função na Vercel.
+export const maxDuration = 60;
+
 const ACTIONS = ["publicar", "atualizar", "pausar", "reativar", "encerrar"] as const;
 
 // Publica, atualiza, pausa, reativa ou encerra o anúncio de um veículo.
