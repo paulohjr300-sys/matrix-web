@@ -21,6 +21,7 @@ type Identidade = {
     whatsapp: string
     email: string
     endereco: string
+    cep: string
     horario_atendimento: string
     instagram: string
     facebook: string
@@ -39,6 +40,7 @@ const EMPTY: Identidade = {
     whatsapp: '',
     email: '',
     endereco: '',
+    cep: '',
     horario_atendimento: '',
     instagram: '',
     facebook: '',
@@ -389,14 +391,30 @@ export default function IdentidadePage() {
                                     </Field>
                                 </div>
 
-                                <Field label="Endereço">
-                                    <input
-                                        value={form.endereco}
-                                        onChange={(e) => setField('endereco', e.target.value)}
-                                        placeholder="Rua, número, bairro - Cidade/UF"
-                                        className={inputClass}
-                                    />
-                                </Field>
+                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_180px]">
+                                    <Field label="Endereço">
+                                        <input
+                                            value={form.endereco}
+                                            onChange={(e) => setField('endereco', e.target.value)}
+                                            placeholder="Rua, número, bairro - Cidade/UF"
+                                            className={inputClass}
+                                        />
+                                    </Field>
+                                    <Field label="CEP">
+                                        <input
+                                            value={form.cep}
+                                            onChange={(e) =>
+                                                setField(
+                                                    'cep',
+                                                    e.target.value.replace(/\D/g, '').slice(0, 8).replace(/^(\d{5})(\d)/, '$1-$2')
+                                                )
+                                            }
+                                            placeholder="00000-000"
+                                            inputMode="numeric"
+                                            className={inputClass}
+                                        />
+                                    </Field>
+                                </div>
 
                                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                     <Field label="Instagram">

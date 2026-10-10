@@ -9,6 +9,7 @@ import { ConfirmDialog } from '../components/ui/confirm-dialog'
 import { supabase } from '../../lib/supabase'
 import { openVehicleDocument, tenantFilePath } from '../../lib/tenant'
 import { FipeLookup, FipePriceInfo, type FipeSelection } from './fipe-lookup'
+import { PortalListings } from './portal-listings'
 import { Eye, FileText, ImageIcon, Pencil, Star, Trash2, Upload, X } from 'lucide-react'
 
 type Brand = {
@@ -64,6 +65,8 @@ type Vehicle = {
     status: string
     is_published: boolean
     main_photo_file_id: string | null
+    doors?: number | null
+    description?: string | null
     versao?: string | null
     fipe_codigo?: string | null
     fipe_tipo?: string | null
@@ -205,6 +208,9 @@ export default function VeiculosPage() {
     const [notes, setNotes] = useState('')
     const [status, setStatus] = useState('EM_ESTOQUE')
     const [fipe, setFipe] = useState<VehicleFipe>(EMPTY_FIPE)
+    const [doors, setDoors] = useState('')
+    const [portalsVersion, setPortalsVersion] = useState(0)
+    const [description, setDescription] = useState('')
 
     const [loading, setLoading] = useState(false)
     const [deleteVehicleId, setDeleteVehicleId] = useState<string | null>(null)
@@ -299,6 +305,8 @@ export default function VeiculosPage() {
         setMainPhotoFileId(null)
         setStatus('EM_ESTOQUE')
         setFipe(EMPTY_FIPE)
+        setDoors('')
+        setDescription('')
         setVehicleFiles([])
         setPendingFiles([])
         setDeleteFile(null)
@@ -394,6 +402,8 @@ export default function VeiculosPage() {
         status,
         main_photo_file_id,
         is_published,
+        doors,
+        description,
         versao,
         fipe_codigo,
         fipe_tipo,
@@ -689,6 +699,23 @@ export default function VeiculosPage() {
         showToast('success', 'Dados da FIPE aplicados', 'Confira os campos e salve o veículo.')
     }
 
+    // Leva preço, fotos e situação do veículo para os anúncios nos portais.
+    async function syncPortals(vehicleId: string) {
+        const response = await fetch('/api/integracoes/sincronizar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ vehicleId }),
+        }).catch(() => null)
+
+        const result = await response?.json().catch(() => null)
+
+        if (result?.erros?.length) {
+            showToast('error', 'Anúncios nos portais', result.erros.join(' '))
+        }
+
+        setPortalsVersion((current) => current + 1)
+    }
+
     async function handleSaveVehicle() {
         if (!plate.trim()) {
             showToast('error', 'Campo obrigatório', 'Informe a placa do veículo.')
@@ -753,6 +780,8 @@ export default function VeiculosPage() {
             status,
             ...fipe,
             versao: fipe.versao.trim() || null,
+            doors: doors ? Number(doors) : null,
+            description: description.trim() || null,
         }
 
         if (editingVehicleId) {
@@ -810,6 +839,8 @@ export default function VeiculosPage() {
 
             setPendingFiles([])
             setLoading(false)
+
+            void syncPortals(editingVehicleId)
 
             showToast(
                 'success',
@@ -873,6 +904,8 @@ export default function VeiculosPage() {
         setShowForm(true)
         setIsPublished(vehicle.is_published || false)
         setMainPhotoFileId(vehicle.main_photo_file_id || null)
+        setDoors(vehicle.doors ? String(vehicle.doors) : '')
+        setDescription(vehicle.description || '')
         setFipe({
             versao: vehicle.versao || '',
             fipe_codigo: vehicle.fipe_codigo || null,
@@ -1253,6 +1286,22 @@ export default function VeiculosPage() {
                                 </div>
 
                                 <div>
+                                    <label className="text-sm font-medium text-zinc-700">Portas</label>
+                                    <select
+                                        value={doors}
+                                        onChange={(event) => setDoors(event.target.value)}
+                                        className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10"
+                                    >
+                                        <option value="">Selecione</option>
+                                        {[2, 3, 4, 5].map((value) => (
+                                            <option key={value} value={value}>
+                                                {value}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div>
                                     <label className="text-sm font-medium text-zinc-700">KM</label>
                                     <input
                                         type="number"
@@ -1359,6 +1408,19 @@ export default function VeiculosPage() {
                                             : 'Este veículo ainda não aparece no site.'}
                                     </p>
                                 </div>
+                                <div className="md:col-span-3">
+                                    <label className="text-sm font-medium text-zinc-700">
+                                        Descrição do anúncio
+                                    </label>
+                                    <textarea
+                                        value={description}
+                                        onChange={(event) => setDescription(event.target.value)}
+                                        placeholder="Texto que aparece no site e nos portais: estado do veículo, opcionais, revisões..."
+                                        rows={4}
+                                        className="mt-2 w-full resize-none rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10"
+                                    />
+                                </div>
+
                                 <div className="md:col-span-3">
                                     <label className="text-sm font-medium text-zinc-700">
                                         Observações
@@ -1645,6 +1707,14 @@ export default function VeiculosPage() {
                                     </div>
                                 </div>
                             </div>
+
+                            {editingVehicleId && (
+                                <PortalListings
+                                    key={`${editingVehicleId}-${portalsVersion}`}
+                                    vehicleId={editingVehicleId}
+                                    onMessage={showToast}
+                                />
+                            )}
 
                             <div className="mt-6 flex flex-wrap gap-3">
                                 <button

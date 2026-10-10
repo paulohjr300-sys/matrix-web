@@ -12,6 +12,7 @@ import {
     ImageIcon,
     Users,
     Store,
+    Link2,
 } from 'lucide-react'
 import { RouteGuard } from '../components/auth/route-guard'
 
@@ -21,6 +22,12 @@ const items = [
         description: 'Logo, cores, contatos e textos do site da loja.',
         href: '/configuracoes/identidade',
         icon: Store,
+    },
+    {
+        title: 'Integrações',
+        description: 'Publique o estoque no Mercado Livre e outros portais.',
+        href: '/configuracoes/integracoes',
+        icon: Link2,
     },
     {
         title: 'Marcas',
