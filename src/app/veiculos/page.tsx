@@ -8,6 +8,7 @@ import { Toast } from '../components/ui/toast'
 import { ConfirmDialog } from '../components/ui/confirm-dialog'
 import { supabase } from '../../lib/supabase'
 import { openVehicleDocument, tenantFilePath } from '../../lib/tenant'
+import { FipeLookup, FipePriceInfo, type FipeSelection } from './fipe-lookup'
 import { Eye, FileText, ImageIcon, Pencil, Star, Trash2, Upload, X } from 'lucide-react'
 
 type Brand = {
@@ -63,6 +64,14 @@ type Vehicle = {
     status: string
     is_published: boolean
     main_photo_file_id: string | null
+    versao?: string | null
+    fipe_codigo?: string | null
+    fipe_tipo?: string | null
+    fipe_marca_codigo?: string | null
+    fipe_modelo_codigo?: string | null
+    fipe_ano_codigo?: string | null
+    preco_fipe?: number | null
+    fipe_referencia?: string | null
     brands?: { name: string } | null
     vehicle_models?: { name: string } | null
     vehicle_categories?: { name: string } | null
@@ -70,6 +79,41 @@ type Vehicle = {
     transmissions?: { name: string } | null
     fuels?: { name: string } | null
     colors?: { name: string } | null
+}
+
+type VehicleFipe = {
+    versao: string
+    fipe_codigo: string | null
+    fipe_tipo: string | null
+    fipe_marca_codigo: string | null
+    fipe_modelo_codigo: string | null
+    fipe_ano_codigo: string | null
+    preco_fipe: number | null
+    fipe_referencia: string | null
+}
+
+const EMPTY_FIPE: VehicleFipe = {
+    versao: '',
+    fipe_codigo: null,
+    fipe_tipo: null,
+    fipe_marca_codigo: null,
+    fipe_modelo_codigo: null,
+    fipe_ano_codigo: null,
+    preco_fipe: null,
+    fipe_referencia: null,
+}
+
+function normalizeName(value: string) {
+    return value
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .trim()
+        .toLowerCase()
+}
+
+// Combustível da FIPE -> nome usado nos cadastros da loja.
+const FIPE_FUEL_ALIASES: Record<string, string> = {
+    alcool: 'etanol',
 }
 
 const statusOptions = [
@@ -160,6 +204,7 @@ export default function VeiculosPage() {
     const [renavam, setRenavam] = useState('')
     const [notes, setNotes] = useState('')
     const [status, setStatus] = useState('EM_ESTOQUE')
+    const [fipe, setFipe] = useState<VehicleFipe>(EMPTY_FIPE)
 
     const [loading, setLoading] = useState(false)
     const [deleteVehicleId, setDeleteVehicleId] = useState<string | null>(null)
@@ -253,6 +298,7 @@ export default function VeiculosPage() {
         setIsPublished(false)
         setMainPhotoFileId(null)
         setStatus('EM_ESTOQUE')
+        setFipe(EMPTY_FIPE)
         setVehicleFiles([])
         setPendingFiles([])
         setDeleteFile(null)
@@ -348,6 +394,14 @@ export default function VeiculosPage() {
         status,
         main_photo_file_id,
         is_published,
+        versao,
+        fipe_codigo,
+        fipe_tipo,
+        fipe_marca_codigo,
+        fipe_modelo_codigo,
+        fipe_ano_codigo,
+        preco_fipe,
+        fipe_referencia,
         brands(name),
         vehicle_models(name),
         engines(name),
@@ -586,6 +640,55 @@ export default function VeiculosPage() {
     }
 
 
+    async function handleApplyFipe(selection: FipeSelection) {
+        const response = await fetch('/api/fipe/vincular', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ brandName: selection.marcaNome, modelName: selection.modeloNome }),
+        })
+
+        const result = await response.json().catch(() => ({}))
+
+        if (!response.ok) {
+            showToast('error', 'Erro', result.message || 'Não foi possível usar os dados da FIPE.')
+            return
+        }
+
+        const { brand, model } = result as { brand: Brand; model: VehicleModel }
+
+        setBrands((current) =>
+            current.some((item) => item.id === brand.id)
+                ? current
+                : [...current, brand].sort((a, b) => a.name.localeCompare(b.name))
+        )
+        setModels((current) =>
+            current.some((item) => item.id === model.id) ? current : [...current, model]
+        )
+        setBrandId(brand.id)
+        setModelId(model.id)
+
+        const fuelKey = normalizeName(selection.combustivel)
+        const fuel = fuels.find(
+            (item) => normalizeName(item.name) === (FIPE_FUEL_ALIASES[fuelKey] || fuelKey)
+        )
+        if (fuel) setFuelId(fuel.id)
+
+        if (selection.anoModelo) setModelYear(String(selection.anoModelo))
+
+        setFipe({
+            versao: selection.versao,
+            fipe_codigo: selection.codigoFipe,
+            fipe_tipo: selection.tipo,
+            fipe_marca_codigo: selection.marcaCodigo,
+            fipe_modelo_codigo: selection.modeloCodigo,
+            fipe_ano_codigo: selection.anoCodigo,
+            preco_fipe: selection.preco,
+            fipe_referencia: selection.referencia,
+        })
+
+        showToast('success', 'Dados da FIPE aplicados', 'Confira os campos e salve o veículo.')
+    }
+
     async function handleSaveVehicle() {
         if (!plate.trim()) {
             showToast('error', 'Campo obrigatório', 'Informe a placa do veículo.')
@@ -648,6 +751,8 @@ export default function VeiculosPage() {
             is_published: finalIsPublished,
             main_photo_file_id: mainPhotoFileId,
             status,
+            ...fipe,
+            versao: fipe.versao.trim() || null,
         }
 
         if (editingVehicleId) {
@@ -768,6 +873,16 @@ export default function VeiculosPage() {
         setShowForm(true)
         setIsPublished(vehicle.is_published || false)
         setMainPhotoFileId(vehicle.main_photo_file_id || null)
+        setFipe({
+            versao: vehicle.versao || '',
+            fipe_codigo: vehicle.fipe_codigo || null,
+            fipe_tipo: vehicle.fipe_tipo || null,
+            fipe_marca_codigo: vehicle.fipe_marca_codigo || null,
+            fipe_modelo_codigo: vehicle.fipe_modelo_codigo || null,
+            fipe_ano_codigo: vehicle.fipe_ano_codigo || null,
+            preco_fipe: vehicle.preco_fipe ?? null,
+            fipe_referencia: vehicle.fipe_referencia || null,
+        })
         void loadVehicleFiles(vehicle.id)
     }
 
@@ -957,6 +1072,11 @@ export default function VeiculosPage() {
                                 </button>
                             </div>
 
+                            <FipeLookup
+                                onApply={handleApplyFipe}
+                                onError={(message) => showToast('error', 'FIPE', message)}
+                            />
+
                             <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
                                 <div>
                                     <label className="text-sm font-medium text-zinc-700">Placa</label>
@@ -1011,6 +1131,18 @@ export default function VeiculosPage() {
                                     </select>
                                 </div>
 
+
+                                <div>
+                                    <label className="text-sm font-medium text-zinc-700">Versão</label>
+                                    <input
+                                        value={fipe.versao}
+                                        onChange={(event) =>
+                                            setFipe((current) => ({ ...current, versao: event.target.value }))
+                                        }
+                                        placeholder="Ex: 1.0 TSI Comfortline Aut."
+                                        className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10"
+                                    />
+                                </div>
 
                                 <div>
                                     <label className="text-sm font-medium text-zinc-700">Categoria</label>
@@ -1174,6 +1306,12 @@ export default function VeiculosPage() {
                                     <CurrencyInput
                                         value={advertisedPrice}
                                         onChange={setAdvertisedPrice}
+                                    />
+                                    <FipePriceInfo
+                                        precoFipe={fipe.preco_fipe}
+                                        referencia={fipe.fipe_referencia || ''}
+                                        codigo={fipe.fipe_codigo || ''}
+                                        anuncio={advertisedPrice ? parseCurrency(advertisedPrice) : 0}
                                     />
                                 </div>
 
