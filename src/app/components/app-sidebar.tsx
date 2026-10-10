@@ -12,10 +12,12 @@ import {
   Settings,
   Calculator,
   LogOut,
+  ExternalLink,
   UserRound,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { PainelLogo } from './brand/painel-logo'
+import { getSiteUrl } from '../../lib/tenant'
 
 type Role = 'ADMIN' | 'GERENTE' | 'VENDEDOR'
 
@@ -104,6 +106,12 @@ export function AppSidebar() {
     loadProfile()
   }, [])
 
+  const [siteUrl, setSiteUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    getSiteUrl().then(setSiteUrl).catch(() => setSiteUrl(null))
+  }, [])
+
   async function handleLogout() {
     localStorage.removeItem('painel_role')
     await supabase.auth.signOut()
@@ -151,9 +159,21 @@ export function AppSidebar() {
         })}
       </nav>
 
+      {siteUrl && (
+        <a
+          href={siteUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="mt-10 flex items-center gap-3 rounded-xl border border-brand-700 px-4 py-3 text-sm font-medium text-brand-100 transition hover:bg-brand-800 hover:text-white"
+        >
+          <ExternalLink size={20} />
+          Ver meu site
+        </a>
+      )}
+
       <button
         onClick={handleLogout}
-        className="mt-10 flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800 hover:text-white"
+        className="mt-2 flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800 hover:text-white"
       >
         <LogOut size={20} />
         Sair

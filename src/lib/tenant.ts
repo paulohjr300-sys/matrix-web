@@ -66,3 +66,25 @@ export async function openVehicleDocument(filePath: string) {
         window.location.href = data.signedUrl
     }
 }
+
+// Endereço público do site da loja logada: o domínio próprio, se a loja
+// tiver um, ou o endereço por caminho no site da plataforma.
+const PLATFORM_SITE_URL = (
+    process.env.NEXT_PUBLIC_SITE_URL || 'https://matrix-site-peach.vercel.app'
+).replace(/\/$/, '')
+
+export async function getSiteUrl() {
+    const empresaId = await getEmpresaId()
+
+    const { data, error } = await supabase
+        .from('empresas')
+        .select('slug, dominio')
+        .eq('id', empresaId)
+        .single()
+
+    if (error || !data) throw new Error('Loja não encontrada.')
+
+    return data.dominio
+        ? `https://${data.dominio}`
+        : `${PLATFORM_SITE_URL}/loja/${data.slug}`
+}
