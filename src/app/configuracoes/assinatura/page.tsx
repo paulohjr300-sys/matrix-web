@@ -36,6 +36,8 @@ type Situacao = {
         temDocumento: boolean
     } | null
     faturaEmAberto: Pagamento | null
+    upgradePendente: { plano: PlanoId; valor: number; fatura_url: string | null } | null
+    trocaAgendada: { plano: PlanoId; aPartirDe: string | null } | null
     pagamentos: Pagamento[]
 }
 
@@ -142,11 +144,21 @@ export default function AssinaturaPage() {
                 return
             }
 
-            showToast(
-                'success',
-                result.nova ? 'Assinatura criada' : 'Plano atualizado',
-                result.faturaUrl ? 'A fatura já está disponível abaixo.' : undefined
-            )
+            if (result.diferenca) {
+                showToast(
+                    'success',
+                    'Falta pagar a diferença',
+                    `O plano ${PLANOS[plano].nome} é liberado assim que a diferença de ${formatarPreco(result.diferenca)} for paga.`
+                )
+            } else if (result.agendado) {
+                showToast('success', 'Troca agendada', `O plano ${PLANOS[plano].nome} começa a valer na próxima mensalidade.`)
+            } else {
+                showToast(
+                    'success',
+                    result.nova ? 'Assinatura criada' : 'Plano atualizado',
+                    result.faturaUrl ? 'A fatura já está disponível abaixo.' : undefined
+                )
+            }
             await load()
         } finally {
             setEnviando(false)
@@ -226,6 +238,40 @@ export default function AssinaturaPage() {
                                     </p>
                                 )}
                             </div>
+
+                            {situacao.upgradePendente && (
+                                <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-brand-50 p-4 ring-1 ring-brand-200">
+                                    <div>
+                                        <p className="font-bold text-zinc-900">
+                                            Diferença para o plano {PLANOS[situacao.upgradePendente.plano]?.nome}:{' '}
+                                            {formatarPreco(situacao.upgradePendente.valor)}
+                                        </p>
+                                        <p className="text-sm text-zinc-600">
+                                            Proporcional aos dias que faltam do mês já pago. O plano é liberado assim que
+                                            ela for paga.
+                                        </p>
+                                    </div>
+                                    {situacao.upgradePendente.fatura_url && (
+                                        <a
+                                            href={situacao.upgradePendente.fatura_url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-brand-700"
+                                        >
+                                            Pagar diferença <ExternalLink size={16} />
+                                        </a>
+                                    )}
+                                </div>
+                            )}
+
+                            {situacao.trocaAgendada && (
+                                <p className="mt-5 rounded-2xl bg-zinc-50 p-4 text-sm text-zinc-700 ring-1 ring-zinc-200">
+                                    O plano <strong>{PLANOS[situacao.trocaAgendada.plano]?.nome}</strong> começa a valer na
+                                    próxima mensalidade
+                                    {situacao.trocaAgendada.aPartirDe && ` (${data(situacao.trocaAgendada.aPartirDe)})`}. Até
+                                    lá, continua o plano {PLANOS[situacao.plano].nome}, que já está pago.
+                                </p>
+                            )}
 
                             {situacao.faturaEmAberto?.fatura_url && (
                                 <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-ponteiro/10 p-4 ring-1 ring-ponteiro/30">
@@ -345,6 +391,13 @@ export default function AssinaturaPage() {
                                         {enviando && <Loader2 size={16} className="animate-spin" />}
                                         {assinaturaAtiva ? 'Salvar alterações' : 'Assinar'}
                                     </button>
+
+                                    {assinaturaAtiva && (
+                                        <p className="mt-2 text-xs text-zinc-500">
+                                            Subir de plano: você paga só a diferença proporcional aos dias que faltam do
+                                            mês já pago. Descer de plano: vale a partir da próxima mensalidade.
+                                        </p>
+                                    )}
 
                                     {!assinaturaAtiva && situacao.status === 'trial' && (situacao.diasDeTeste ?? 0) > 0 && (
                                         <p className="mt-2 text-xs text-zinc-500">

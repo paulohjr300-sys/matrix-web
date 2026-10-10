@@ -138,6 +138,32 @@ export function atualizarAssinatura(
   });
 }
 
+// Cobrança avulsa (usada para a diferença proporcional na troca de plano).
+export function criarCobranca(dados: {
+  cliente: string;
+  valor: number;
+  formaPagamento: string;
+  vencimento: string;
+  descricao: string;
+  referencia: string;
+}) {
+  return asaas<AsaasPagamento>("/payments", {
+    method: "POST",
+    body: {
+      customer: dados.cliente,
+      billingType: dados.formaPagamento,
+      value: dados.valor,
+      dueDate: dados.vencimento,
+      description: dados.descricao,
+      externalReference: dados.referencia,
+    },
+  });
+}
+
+export function removerCobranca(id: string) {
+  return asaas<{ deleted: boolean }>(`/payments/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
 export function cancelarAssinatura(id: string) {
   return asaas<{ deleted: boolean }>(`/subscriptions/${encodeURIComponent(id)}`, { method: "DELETE" });
 }

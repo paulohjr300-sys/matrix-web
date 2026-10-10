@@ -6,6 +6,8 @@ import {
   cobrancasDaAssinatura,
   criarAssinatura,
   criarCliente,
+  criarCobranca,
+  removerCobranca,
   type AsaasAssinatura,
   type AsaasPagamento,
 } from "./asaas";
@@ -37,6 +39,8 @@ type Assinatura = {
   valor: number | null;
   forma_pagamento: string | null;
   proximo_vencimento: string | null;
+  // Cobrança avulsa da diferença ao subir de plano, ainda não paga.
+  upgrade_pagamento_id: string | null;
 };
 
 type Pagamento = {
@@ -60,6 +64,39 @@ function somarDias(data: string, dias: number) {
   d.setUTCDate(d.getUTCDate() + dias);
   return d.toISOString().slice(0, 10);
 }
+
+function somarMes(data: string) {
+  const d = new Date(`${data}T12:00:00Z`);
+  d.setUTCMonth(d.getUTCMonth() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
+function diasEntre(inicio: string, fim: string) {
+  return Math.round((new Date(`${fim}T12:00:00Z`).getTime() - new Date(`${inicio}T12:00:00Z`).getTime()) / 86400000);
+}
+
+// Diferença proporcional ao subir de plano: para cada mensalidade paga cujo
+// mês ainda não acabou, (novo valor - valor pago) x dias restantes / dias do
+// mês.
+function diferencaProporcional(pagamentos: Pagamento[], subscriptionId: string, novoValor: number, dia: string) {
+  let total = 0;
+
+  for (const p of pagamentos) {
+    if (p.asaas_subscription_id !== subscriptionId || !PAGOS.includes(p.status)) continue;
+
+    const fim = somarMes(p.vencimento);
+    if (fim <= dia) continue;
+
+    const ciclo = diasEntre(p.vencimento, fim);
+    const restantes = Math.min(ciclo, diasEntre(p.vencimento > dia ? p.vencimento : dia, fim));
+    total += Math.max(0, novoValor - p.valor) * (restantes / ciclo);
+  }
+
+  return Math.round(total * 100) / 100;
+}
+
+// O Asaas não aceita cobranças abaixo de R$ 5,00.
+const COBRANCA_MINIMA = 5;
 
 function dataDe(iso: string) {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date(iso));
@@ -155,10 +192,23 @@ export async function situacaoDaLoja(empresaId: string) {
     }
   }
 
+  const upgradePendente = assinatura?.upgrade_pagamento_id
+    ? pagamentos.find((p) => p.id === assinatura.upgrade_pagamento_id && EM_ABERTO.includes(p.status)) ?? null
+    : null;
+
+  // Plano contratado diferente do que vale hoje e sem diferença a pagar:
+  // redução de plano, que começa no próximo mês pago.
+  const trocaAgendada =
+    temAssinatura && assinatura?.plano && assinatura.plano !== empresa.plano && !upgradePendente
+      ? { plano: assinatura.plano, aPartirDe: maisAntiga?.vencimento || assinatura.proximo_vencimento }
+      : null;
+
   return {
     empresa,
     assinatura,
     pagamentos,
+    upgradePendente,
+    trocaAgendada,
     status: empresa.assinatura_status,
     plano: empresa.plano,
     trialTerminaEm: trialFim,
@@ -262,16 +312,66 @@ export async function assinar(
   const valor = PLANOS[pedido.plano]?.preco;
   if (!valor) throw new AsaasError("Este plano ainda não está disponível para contratação.");
 
-  const { empresa, assinatura } = await carregar(empresaId);
+  const { empresa, assinatura, pagamentos } = await carregar(empresaId);
   if (!empresa.ativo) throw new AsaasError("A loja está desativada. Fale com o suporte.", 403);
 
-  // Troca de plano/forma numa assinatura existente.
-  if (assinatura?.asaas_subscription_id && empresa.assinatura_status !== "cancelada") {
-    const atualizada = await atualizarAssinatura(assinatura.asaas_subscription_id, {
+  // Troca de plano/forma numa assinatura existente. As próximas mensalidades
+  // já saem com o novo valor; o que muda é quando o novo plano passa a valer:
+  //   - subir de plano com mês já pago: cobra a diferença proporcional e
+  //     libera o plano quando ela for paga;
+  //   - descer de plano com mês já pago: vale a partir da próxima mensalidade;
+  //   - sem mês pago (teste, fatura em aberto): vale na hora.
+  if (assinatura?.asaas_subscription_id && assinatura.asaas_customer_id && empresa.assinatura_status !== "cancelada") {
+    const subscriptionId = assinatura.asaas_subscription_id;
+
+    const atualizada = await atualizarAssinatura(subscriptionId, {
       valor,
       formaPagamento: pedido.formaPagamento,
       descricao: descricao(pedido.plano),
     });
+
+    // Uma diferença anterior ainda não paga deixa de valer.
+    if (assinatura.upgrade_pagamento_id) {
+      await removerCobranca(assinatura.upgrade_pagamento_id).catch((error) =>
+        console.error("Erro ao remover cobrança de diferença", error),
+      );
+      await supabaseAdmin.from("pagamentos").update({ status: "DELETED" }).eq("id", assinatura.upgrade_pagamento_id);
+    }
+
+    const dia = hoje();
+    const temMesPago = pagamentos.some(
+      (p) => p.asaas_subscription_id === subscriptionId && PAGOS.includes(p.status) && somarMes(p.vencimento) > dia,
+    );
+    const valorAtual = PLANOS[empresa.plano]?.preco ?? 0;
+
+    let planoVigente: PlanoId = pedido.plano;
+    let upgradePagamentoId: string | null = null;
+    let diferenca = 0;
+    let faturaUrl: string | null = null;
+
+    if (pedido.plano !== empresa.plano && temMesPago) {
+      if (valor > valorAtual) {
+        diferenca = diferencaProporcional(pagamentos, subscriptionId, valor, dia);
+
+        if (diferenca >= COBRANCA_MINIMA) {
+          const cobranca = await criarCobranca({
+            cliente: assinatura.asaas_customer_id,
+            valor: diferenca,
+            formaPagamento: pedido.formaPagamento,
+            vencimento: dia,
+            descricao: `painel - diferença para o plano ${PLANOS[pedido.plano].nome} até o fim do mês já pago`,
+            referencia: `upgrade:${empresaId}`,
+          });
+
+          await salvarPagamento(empresaId, cobranca);
+          upgradePagamentoId = cobranca.id;
+          faturaUrl = cobranca.invoiceUrl || null;
+          planoVigente = empresa.plano;
+        }
+      } else {
+        planoVigente = empresa.plano;
+      }
+    }
 
     await supabaseAdmin
       .from("assinaturas")
@@ -280,16 +380,24 @@ export async function assinar(
         valor,
         forma_pagamento: pedido.formaPagamento,
         proximo_vencimento: atualizada.nextDueDate || assinatura.proximo_vencimento,
+        upgrade_pagamento_id: upgradePagamentoId,
         updated_at: new Date().toISOString(),
       })
       .eq("empresa_id", empresaId);
 
-    await supabaseAdmin.from("empresas").update({ plano: pedido.plano }).eq("id", empresaId);
+    if (planoVigente !== empresa.plano) {
+      await supabaseAdmin.from("empresas").update({ plano: planoVigente }).eq("id", empresaId);
+    }
 
-    const cobrancas = await sincronizarCobrancas(empresaId, assinatura.asaas_subscription_id);
-    const aberta = cobrancas.find((c) => EM_ABERTO.includes(c.status));
+    const cobrancas = await sincronizarCobrancas(empresaId, subscriptionId);
+    if (!faturaUrl) faturaUrl = cobrancas.find((c) => EM_ABERTO.includes(c.status))?.invoiceUrl || null;
 
-    return { faturaUrl: aberta?.invoiceUrl || null, nova: false };
+    return {
+      faturaUrl,
+      nova: false,
+      diferenca: upgradePagamentoId ? diferenca : null,
+      agendado: planoVigente !== pedido.plano && !upgradePagamentoId,
+    };
   }
 
   // Primeira contratação (ou nova, depois de cancelada).
@@ -362,6 +470,52 @@ export async function assinar(
   return { faturaUrl: primeira?.invoiceUrl || null, nova: true };
 }
 
+// Depois de um pagamento, o plano contratado passa a valer quando:
+//   - foi paga a diferença do upgrade; ou
+//   - foi paga uma mensalidade da assinatura (fim do mês já pago, no caso
+//     de redução de plano, ou upgrade cuja diferença ficou sem pagar).
+async function aplicarPlanoContratado(empresaId: string, pagamento: AsaasPagamento) {
+  const [{ data: assinatura }, { data: empresa }] = await Promise.all([
+    supabaseAdmin
+      .from("assinaturas")
+      .select("plano, valor, asaas_subscription_id, upgrade_pagamento_id")
+      .eq("empresa_id", empresaId)
+      .maybeSingle(),
+    supabaseAdmin.from("empresas").select("plano").eq("id", empresaId).single(),
+  ]);
+
+  if (!assinatura?.plano || !empresa) return;
+
+  const eDiferenca = pagamento.id === assinatura.upgrade_pagamento_id;
+  // Só mensalidade já com o valor do plano novo: a do mês pago antes da
+  // troca (que pode receber outro aviso, ex.: CONFIRMED e depois RECEIVED
+  // no cartão) tem o valor antigo.
+  const eMensalidade =
+    Boolean(pagamento.subscription) &&
+    pagamento.subscription === assinatura.asaas_subscription_id &&
+    Number(pagamento.value) === Number(assinatura.valor);
+  if (!eDiferenca && !eMensalidade) return;
+
+  // Mensalidade paga antes da diferença: a diferença não é mais devida.
+  if (eMensalidade && assinatura.upgrade_pagamento_id) {
+    await removerCobranca(assinatura.upgrade_pagamento_id).catch((error) =>
+      console.error("Erro ao remover cobrança de diferença", error),
+    );
+    await supabaseAdmin.from("pagamentos").update({ status: "DELETED" }).eq("id", assinatura.upgrade_pagamento_id);
+  }
+
+  if (assinatura.upgrade_pagamento_id) {
+    await supabaseAdmin
+      .from("assinaturas")
+      .update({ upgrade_pagamento_id: null, updated_at: new Date().toISOString() })
+      .eq("empresa_id", empresaId);
+  }
+
+  if (assinatura.plano !== empresa.plano) {
+    await supabaseAdmin.from("empresas").update({ plano: assinatura.plano }).eq("id", empresaId);
+  }
+}
+
 async function empresaDoAsaas(subscriptionId?: string | null, customerId?: string | null) {
   if (subscriptionId) {
     const { data } = await supabaseAdmin
@@ -400,6 +554,7 @@ export async function processarEvento(evento: {
 
     await salvarPagamento(empresaId, pagamento);
     await recalcularStatus(empresaId);
+    if (PAGOS.includes(pagamento.status)) await aplicarPlanoContratado(empresaId, pagamento);
     await atualizarSuspensao(empresaId);
     return;
   }

@@ -40,6 +40,14 @@ export async function GET() {
                 }
               : null,
             faturaEmAberto: situacao.faturaEmAberto,
+            upgradePendente: situacao.upgradePendente
+              ? {
+                  plano: situacao.assinatura?.plano,
+                  valor: situacao.upgradePendente.valor,
+                  fatura_url: situacao.upgradePendente.fatura_url,
+                }
+              : null,
+            trocaAgendada: situacao.trocaAgendada,
             pagamentos: situacao.pagamentos.map((p) => ({
               id: p.id,
               valor: p.valor,
