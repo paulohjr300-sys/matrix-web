@@ -23,6 +23,7 @@ import {
 import { PainelLogo } from './components/brand/painel-logo'
 import { DashboardMockup, FunilMockup, SiteMockup } from './components/landing/mockups'
 import { PLATFORM } from '../lib/platform'
+import { formatarPreco, PLANOS as PRECOS } from '../lib/planos'
 
 export const metadata: Metadata = {
     title: 'painel · Sistema para lojas de carros com CRM, site e portais',
@@ -30,12 +31,12 @@ export const metadata: Metadata = {
         'Estoque com tabela FIPE, funil de vendas, site próprio da loja, publicação no Mercado Livre e lucro real por veículo. Teste grátis por 14 dias.',
 }
 
-// Preços dos planos: preencha quando definir. Sem valor, o card mostra
-// "Fale com a gente".
+// Preços em NEXT_PUBLIC_PLANO_BASICO_PRECO / NEXT_PUBLIC_PLANO_PRO_PRECO
+// (src/lib/planos.ts). Sem valor, o card mostra "Fale com a gente".
 const PLANOS = [
     {
         nome: 'Básico',
-        preco: null as string | null,
+        preco: PRECOS.basico.preco ? formatarPreco(PRECOS.basico.preco) : null,
         descricao: 'Para organizar a loja e vender pelo próprio site.',
         recursos: [
             'Estoque com tabela FIPE',
@@ -49,7 +50,7 @@ const PLANOS = [
     },
     {
         nome: 'Pro',
-        preco: null as string | null,
+        preco: PRECOS.pro.preco ? formatarPreco(PRECOS.pro.preco) : null,
         descricao: 'Para quem quer anunciar em todo lugar sem retrabalho.',
         recursos: [
             'Tudo do Básico',

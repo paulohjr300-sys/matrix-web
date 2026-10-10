@@ -13,10 +13,17 @@ import {
     Users,
     Store,
     Link2,
+    Receipt,
 } from 'lucide-react'
 import { RouteGuard } from '../components/auth/route-guard'
 
 const items = [
+    {
+        title: 'Assinatura',
+        description: 'Plano do painel, forma de pagamento e faturas.',
+        href: '/configuracoes/assinatura',
+        icon: Receipt,
+    },
     {
         title: 'Identidade do site',
         description: 'Logo, cores, contatos e textos do site da loja.',

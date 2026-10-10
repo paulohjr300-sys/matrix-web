@@ -1,5 +1,6 @@
 import { AppSidebar } from '../components/app-sidebar'
 import { AppHeader } from '../components/app-header'
+import { AssinaturaAviso } from './assinatura-aviso'
 
 interface PageContainerProps {
     title: string
@@ -20,6 +21,7 @@ export function PageContainer({
 
             <div className="min-h-screen flex-1">
                 <AppHeader title={title} description={description} />
+                <AssinaturaAviso />
 
                 <main className="p-8">
                     {action && (
