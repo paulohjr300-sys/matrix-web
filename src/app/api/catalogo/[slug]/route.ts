@@ -89,6 +89,11 @@ type Veiculo = {
 export async function GET(request: Request, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const produtos = new URL(request.url).searchParams.get("formato") === "produtos";
+  // Robô da Meta que baixa o catálogo: a leitura fica registrada na loja
+  // para o painel mostrar que a integração está funcionando.
+  const leituraDaMeta = /facebookexternalhit|facebookcatalog|facebot|meta-external/i.test(
+    request.headers.get("user-agent") || "",
+  );
 
   if (!/^[a-z0-9-]{3,40}$/.test(slug)) {
     return new Response("Loja não encontrada.", { status: 404 });
@@ -197,11 +202,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
         .join(",");
     });
 
+    if (leituraDaMeta) await registrarLeitura(empresa.id, linhasProdutos.length, "produtos");
+
     return new Response([cabecalho.join(","), ...linhasProdutos].join("\n"), {
       headers: {
         "Content-Type": "text/csv; charset=utf-8",
         "Content-Disposition": `inline; filename="produtos-${empresa.slug}.csv"`,
-        "Cache-Control": "public, s-maxage=900, stale-while-revalidate=3600",
+        // Sem cache: cada leitura da Meta passa pelo servidor e é registrada.
+        "Cache-Control": "no-store",
       },
     });
   }
@@ -288,12 +296,25 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
 
   const csv = [header.join(","), ...linhas].join("\n");
 
+  if (leituraDaMeta) await registrarLeitura(empresa.id, linhas.length, "veiculos");
+
   return new Response(csv, {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `inline; filename="catalogo-${empresa.slug}.csv"`,
-      // A Meta busca 1x por dia; cache curto para refletir vendas rápido.
-      "Cache-Control": "public, s-maxage=900, stale-while-revalidate=3600",
+      // Sem cache: cada leitura da Meta passa pelo servidor e é registrada.
+      "Cache-Control": "no-store",
     },
   });
+}
+
+async function registrarLeitura(empresaId: string, itens: number, formato: string) {
+  await supabaseAdmin
+    .from("empresas")
+    .update({
+      catalogo_meta_lido_em: new Date().toISOString(),
+      catalogo_meta_itens: itens,
+      catalogo_meta_formato: formato,
+    })
+    .eq("id", empresaId);
 }

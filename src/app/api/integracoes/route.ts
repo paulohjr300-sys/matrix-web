@@ -20,7 +20,7 @@ export async function GET() {
 
   const { data: empresa } = await supabaseAdmin
     .from("empresas")
-    .select("slug, cep")
+    .select("slug, cep, catalogo_meta_lido_em, catalogo_meta_itens, catalogo_meta_formato")
     .eq("id", auth.empresaId)
     .single();
 
@@ -29,7 +29,16 @@ export async function GET() {
   return NextResponse.json({
     liberado: await integrationsAllowed(auth.empresaId),
     // Catálogo para Facebook/Instagram: endereço público do arquivo da loja.
-    catalogo: empresa ? { slug: empresa.slug, temCep: (empresa.cep || "").replace(/\D/g, "").length === 8 } : null,
+    catalogo: empresa
+      ? {
+          slug: empresa.slug,
+          temCep: (empresa.cep || "").replace(/\D/g, "").length === 8,
+          // Última vez que o robô da Meta baixou o catálogo.
+          lidoEm: empresa.catalogo_meta_lido_em,
+          itens: empresa.catalogo_meta_itens,
+          formato: empresa.catalogo_meta_formato,
+        }
+      : null,
     // Ferramenta de desenvolvimento: criar usuário de teste do ML.
     usuarioTeste: process.env.ML_ALLOW_TEST_USERS === "true" && auth.role === "ADMIN",
     portais: [

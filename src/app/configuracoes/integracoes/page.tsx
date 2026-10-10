@@ -48,7 +48,7 @@ function Integracoes() {
     const [portais, setPortais] = useState<PortalInfo[]>([])
     const [liberado, setLiberado] = useState(true)
     const [usuarioTeste, setUsuarioTeste] = useState(false)
-    const [catalogo, setCatalogo] = useState<{ slug: string; temCep: boolean } | null>(null)
+    const [catalogo, setCatalogo] = useState<{ slug: string; temCep: boolean; lidoEm: string | null; itens: number | null; formato: string | null } | null>(null)
     const [criandoTeste, setCriandoTeste] = useState(false)
     const [contaTeste, setContaTeste] = useState<{ nickname: string; password: string; email: string | null } | null>(null)
     const [loading, setLoading] = useState(true)
@@ -298,7 +298,7 @@ function Integracoes() {
                     </div>
                 )}
 
-                {!loading && catalogo && <CatalogoMeta slug={catalogo.slug} temCep={catalogo.temCep} />}
+                {!loading && catalogo && <CatalogoMeta slug={catalogo.slug} temCep={catalogo.temCep} leitura={catalogo} />}
             </PageContainer>
         </RouteGuard>
     )

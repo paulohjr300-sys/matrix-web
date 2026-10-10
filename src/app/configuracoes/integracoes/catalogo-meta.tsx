@@ -52,7 +52,15 @@ function EnderecoCatalogo({ titulo, descricao, url }: { titulo: string; descrica
 
 // Catálogo para Facebook e Instagram: a loja cola um destes endereços no
 // Gerenciador de Comércio da Meta, que lê o estoque todo dia.
-export function CatalogoMeta({ slug, temCep }: { slug: string; temCep: boolean }) {
+export function CatalogoMeta({
+    slug,
+    temCep,
+    leitura,
+}: {
+    slug: string
+    temCep: boolean
+    leitura?: { lidoEm: string | null; itens: number | null; formato: string | null }
+}) {
     const base = `${typeof window !== 'undefined' ? window.location.origin : ''}/api/catalogo/${slug}`
 
     return (
@@ -68,6 +76,19 @@ export function CatalogoMeta({ slug, temCep }: { slug: string; temCep: boolean }
                 Anuncie o estoque no Facebook e no Instagram com os anúncios de catálogo da Meta. O arquivo é
                 atualizado sozinho com os veículos publicados no site; vendido sai na próxima leitura da Meta.
             </p>
+
+            {leitura?.lidoEm ? (
+                <p className="mt-4 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800 ring-1 ring-emerald-200">
+                    <strong>Integrado:</strong> a Meta leu o catálogo em {new Date(leitura.lidoEm).toLocaleString('pt-BR')}
+                    {leitura.itens !== null && <> · {leitura.itens} veículo(s) enviado(s)</>}
+                    {leitura.formato && <> · formato {leitura.formato === 'produtos' ? 'Produtos' : 'Veículos'}</>}.
+                </p>
+            ) : (
+                <p className="mt-4 rounded-xl bg-zinc-50 p-3 text-sm text-zinc-600 ring-1 ring-zinc-200">
+                    A Meta ainda não leu o catálogo desta loja. Depois de colar o endereço no Gerenciador de Comércio, a
+                    primeira leitura costuma acontecer em alguns minutos; atualize esta página para conferir.
+                </p>
+            )}
 
             <div className="mt-5 space-y-3">
                 <EnderecoCatalogo
