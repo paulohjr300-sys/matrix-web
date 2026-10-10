@@ -82,8 +82,13 @@ type Veiculo = {
   created_at: string | null;
 };
 
-export async function GET(_request: Request, { params }: { params: Promise<{ slug: string }> }) {
+// Dois formatos no mesmo endereço:
+//   (padrão)            catálogo de Veículos da Meta (exige localização da loja)
+//   ?formato=produtos   catálogo de Produtos (e-commerce), disponível em
+//                       qualquer conta da Meta
+export async function GET(request: Request, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
+  const produtos = new URL(request.url).searchParams.get("formato") === "produtos";
 
   if (!/^[a-z0-9-]{3,40}$/.test(slug)) {
     return new Response("Loja não encontrada.", { status: 404 });
@@ -99,9 +104,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ slu
     return new Response("Loja não encontrada.", { status: 404 });
   }
 
-  const geo = await lojaGeo(empresa);
+  const geo = produtos ? null : await lojaGeo(empresa);
 
-  if (!geo) {
+  if (!produtos && !geo) {
     return new Response(
       "Cadastre o CEP da loja em Configurações > Identidade do site para gerar o catálogo.",
       { status: 409 },
@@ -136,6 +141,70 @@ export async function GET(_request: Request, { params }: { params: Promise<{ slu
   const siteBase = empresa.dominio ? `https://${empresa.dominio}` : `${SITE_URL}/loja/${empresa.slug}`;
   const telefone = (empresa.whatsapp || empresa.telefone || "").replace(/\D/g, "");
   const dealerPhone = telefone ? `+${telefone.length <= 11 ? `55${telefone}` : telefone}` : "";
+
+  const comFotos = lista
+    // Sem foto, preço, marca, modelo ou ano a Meta recusa o item.
+    .filter((v) => v.brand_name && v.model_name && v.model_year && v.advertised_price)
+    .map((v) => ({
+      v,
+      fotos: [...new Set([v.main_image_url, ...(fotosPorVeiculo.get(v.id) || [])].filter(Boolean))] as string[],
+      titulo: [v.brand_name, v.model_name, v.versao, v.model_year].filter(Boolean).join(" "),
+    }))
+    .filter((item) => item.fotos.length > 0);
+
+  const descricaoDe = (item: (typeof comFotos)[number]) =>
+    cleanDescription(
+      item.v.description ||
+        item.v.notes ||
+        `${item.titulo}. Veículo disponível na ${empresa.nome}. Entre em contato para mais informações.`,
+    );
+
+  if (produtos) {
+    // Campos do catálogo de produtos: id, title, description, availability,
+    // condition, price, link, image_link, brand (+ fotos extras e tipo).
+    const cabecalho = [
+      "id",
+      "title",
+      "description",
+      "availability",
+      "condition",
+      "price",
+      "link",
+      "image_link",
+      "additional_image_link",
+      "brand",
+      "product_type",
+    ];
+
+    const linhasProdutos = comFotos.map((item) => {
+      const km = Math.max(0, Math.round(Number(item.v.km || 0)));
+      const kmTexto = km ? ` · ${km.toLocaleString("pt-BR")} km` : "";
+
+      return [
+        item.v.id,
+        `${item.titulo}${kmTexto}`.slice(0, 200),
+        descricaoDe(item).slice(0, 9999),
+        "in stock",
+        km === 0 ? "new" : "used",
+        `${Math.round(Number(item.v.advertised_price))} BRL`,
+        `${siteBase}/estoque/${item.v.slug || item.v.id}`,
+        item.fotos[0],
+        item.fotos.slice(1, 20).join(","),
+        item.v.brand_name,
+        `Veículos > ${item.v.category_name || "Carros"}`,
+      ]
+        .map(csvCell)
+        .join(",");
+    });
+
+    return new Response([cabecalho.join(","), ...linhasProdutos].join("\n"), {
+      headers: {
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": `inline; filename="produtos-${empresa.slug}.csv"`,
+        "Cache-Control": "public, s-maxage=900, stale-while-revalidate=3600",
+      },
+    });
+  }
 
   const MAX_FOTOS = 10;
   const header = [
@@ -203,13 +272,13 @@ export async function GET(_request: Request, { params }: { params: Promise<{ slu
         "car_truck",
         empresa.nome,
         dealerPhone,
-        empresa.endereco || geo.logradouro || "",
-        geo.cidade,
-        geo.uf,
+        empresa.endereco || geo!.logradouro || "",
+        geo!.cidade,
+        geo!.uf,
         "BR",
-        geo.cep,
-        geo.latitude ?? "",
-        geo.longitude ?? "",
+        geo!.cep,
+        geo!.latitude ?? "",
+        geo!.longitude ?? "",
         ...Array.from({ length: MAX_FOTOS }, (_, i) => fotos[i] || ""),
       ];
 
