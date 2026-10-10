@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-const publicRoutes = ["/login", "/reset-password"];
+const publicRoutes = ["/login", "/reset-password", "/cadastro"];
 
 // Rotas liberadas para qualquer usuário autenticado e ativo.
 const sharedRoutes = ["/alterar-senha"];
@@ -95,7 +95,7 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  if (user && pathname === "/login") {
+  if (user && (pathname === "/login" || pathname === "/cadastro")) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 

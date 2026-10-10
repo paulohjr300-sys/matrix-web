@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabase'
 import { PainelLogo } from '../components/brand/painel-logo'
@@ -50,8 +51,13 @@ export default function LoginPage() {
 
 
         if (profileError || !profile) {
+            await supabase.auth.signOut()
             setMessageType('error')
-            setMessage('Não foi possível carregar seu perfil.')
+            setMessage(
+                profileError?.code === 'PGRST116'
+                    ? 'Esta conta não está vinculada a nenhuma loja. Cadastre sua loja ou peça acesso ao administrador.'
+                    : 'Não foi possível carregar seu perfil.'
+            )
             return
         }
 
@@ -162,6 +168,13 @@ export default function LoginPage() {
                     >
                         Esqueci minha senha
                     </button>
+
+                    <p className="border-t border-zinc-100 pt-5 text-center text-sm text-zinc-500">
+                        Ainda não usa o painel?{' '}
+                        <Link href="/cadastro" className="font-semibold text-brand-600 hover:text-brand-700">
+                            Cadastre sua loja
+                        </Link>
+                    </p>
                 </form>
             </div>
         </main>
