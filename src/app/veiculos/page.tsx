@@ -8,7 +8,13 @@ import { Toast } from '../components/ui/toast'
 import { ConfirmDialog } from '../components/ui/confirm-dialog'
 import { supabase } from '../../lib/supabase'
 import { openVehicleDocument, tenantFilePath } from '../../lib/tenant'
-import { FipeLookup, FipePriceInfo, type FipeSelection } from './fipe-lookup'
+import {
+    FipeLookup,
+    FipePriceInfo,
+    guessModelName,
+    normalizeBrandName,
+    type FipeSelection,
+} from './fipe-lookup'
 import { PortalListings } from './portal-listings'
 import { Eye, FileText, ImageIcon, Pencil, Star, Trash2, Upload, X } from 'lucide-react'
 
@@ -208,6 +214,7 @@ export default function VeiculosPage() {
     const [notes, setNotes] = useState('')
     const [status, setStatus] = useState('EM_ESTOQUE')
     const [fipe, setFipe] = useState<VehicleFipe>(EMPTY_FIPE)
+    const [buscandoPlaca, setBuscandoPlaca] = useState(false)
     const [doors, setDoors] = useState('')
     const [portalsVersion, setPortalsVersion] = useState(0)
     const [description, setDescription] = useState('')
@@ -649,6 +656,78 @@ export default function VeiculosPage() {
         return data.publicUrl
     }
 
+
+    // Consulta a placa e preenche marca, modelo, versão, anos, cor,
+    // combustível e preço FIPE (pela mesma rotina da busca na FIPE).
+    async function handleBuscarPlaca() {
+        if (plate.trim().length !== 7) {
+            showToast('error', 'Placa incompleta', 'Digite a placa com 7 caracteres (ex.: ABC1D23).')
+            return
+        }
+
+        setBuscandoPlaca(true)
+
+        try {
+            const response = await fetch(`/api/placa/${plate.trim()}`)
+            const result = await response.json().catch(() => ({}))
+
+            if (!response.ok) {
+                showToast('error', 'Consulta por placa', result.message || 'Não foi possível consultar a placa.')
+                return
+            }
+
+            if (result.anoFabricacao) setManufactureYear(String(result.anoFabricacao))
+            if (result.anoModelo) setModelYear(String(result.anoModelo))
+
+            if (result.cor) {
+                const cor = colors.find((item) => normalizeName(item.name) === normalizeName(result.cor))
+                if (cor) setColorId(cor.id)
+            }
+
+            if (result.fipe?.anoCodigo) {
+                const modeloNome = guessModelName(result.fipe.modeloFipe)
+                const modeloFipe: string = result.fipe.modeloFipe
+
+                await handleApplyFipe({
+                    tipo: 'cars',
+                    marcaCodigo: result.fipe.marcaCodigo,
+                    modeloCodigo: result.fipe.modeloCodigo,
+                    anoCodigo: result.fipe.anoCodigo,
+                    marcaNome: normalizeBrandName(result.fipe.marcaFipe),
+                    modeloNome,
+                    versao: modeloFipe.toLowerCase().startsWith(modeloNome.toLowerCase())
+                        ? modeloFipe.slice(modeloNome.length).trim() || modeloFipe
+                        : modeloFipe,
+                    codigoFipe: result.fipe.codigoFipe || '',
+                    preco: result.fipe.preco || 0,
+                    referencia: result.fipe.referencia || '',
+                    anoModelo: result.anoModelo,
+                    combustivel: result.fipe.combustivelFipe || result.combustivel || '',
+                })
+            }
+
+            const situacao = result.situacao ? String(result.situacao) : null
+            const local = [result.municipio, result.uf].filter(Boolean).join('/')
+            const resumo = [
+                [result.marca, result.modelo].filter(Boolean).join(' '),
+                situacao,
+                local,
+                result.doCache ? 'consulta repetida, sem custo' : null,
+            ]
+                .filter(Boolean)
+                .join(' · ')
+
+            if (situacao && !/sem restri/i.test(situacao)) {
+                showToast('error', 'Atenção à situação do veículo', resumo)
+            } else if (result.fipe?.anoCodigo) {
+                showToast('success', 'Dados preenchidos pela placa', resumo)
+            } else {
+                showToast('success', 'Placa encontrada', `${resumo}. Escolha a versão em "Buscar na tabela FIPE".`)
+            }
+        } finally {
+            setBuscandoPlaca(false)
+        }
+    }
 
     async function handleApplyFipe(selection: FipeSelection) {
         const response = await fetch('/api/fipe/vincular', {
@@ -1113,20 +1192,37 @@ export default function VeiculosPage() {
                             <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
                                 <div>
                                     <label className="text-sm font-medium text-zinc-700">Placa</label>
-                                    <input
-                                        value={plate}
-                                        onChange={(event) =>
-                                            setPlate(
-                                                event.target.value
-                                                    .toUpperCase()
-                                                    .replace(/\s/g, '')
-                                                    .slice(0, 7)
-                                            )
-                                        }
-                                        placeholder="ABC1D23"
-                                        maxLength={7}
-                                        className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10"
-                                    />
+                                    <div className="mt-2 flex gap-2">
+                                        <input
+                                            value={plate}
+                                            onChange={(event) =>
+                                                setPlate(
+                                                    event.target.value
+                                                        .toUpperCase()
+                                                        .replace(/\s/g, '')
+                                                        .slice(0, 7)
+                                                )
+                                            }
+                                            onKeyDown={(event) => {
+                                                if (event.key === 'Enter') {
+                                                    event.preventDefault()
+                                                    void handleBuscarPlaca()
+                                                }
+                                            }}
+                                            placeholder="ABC1D23"
+                                            maxLength={7}
+                                            className="min-w-0 flex-1 rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => void handleBuscarPlaca()}
+                                            disabled={buscandoPlaca}
+                                            title="Preencher os dados do veículo pela placa"
+                                            className="shrink-0 rounded-xl bg-brand-50 px-3 text-xs font-bold text-brand-700 ring-1 ring-brand-200 transition hover:bg-brand-100 disabled:opacity-50"
+                                        >
+                                            {buscandoPlaca ? 'Buscando...' : 'Buscar pela placa'}
+                                        </button>
+                                    </div>
                                 </div>
 
                                 <div>
