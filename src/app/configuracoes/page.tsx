@@ -11,10 +11,17 @@ import {
     Gauge,
     ImageIcon,
     Users,
+    Store,
 } from 'lucide-react'
 import { RouteGuard } from '../components/auth/route-guard'
 
 const items = [
+    {
+        title: 'Identidade do site',
+        description: 'Logo, cores, contatos e textos do site da loja.',
+        href: '/configuracoes/identidade',
+        icon: Store,
+    },
     {
         title: 'Marcas',
         description: 'Cadastre marcas como Hyundai, Chevrolet, Toyota.',
