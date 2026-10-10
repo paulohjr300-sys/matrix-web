@@ -178,8 +178,11 @@ function Integracoes() {
                     <div className="mb-6 flex items-start gap-3 rounded-2xl bg-amber-50 p-4 text-sm text-amber-800 ring-1 ring-amber-200">
                         <Lock size={18} className="mt-0.5 shrink-0" />
                         <p>
-                            As integrações com portais fazem parte do <strong>plano Pro</strong>. Fale com a
-                            gente para liberar na sua loja.
+                            As integrações com portais e o catálogo do Facebook e Instagram fazem parte do{' '}
+                            <strong>plano Pro</strong>.{' '}
+                            <Link href="/configuracoes/assinatura" className="font-bold underline">
+                                Trocar de plano
+                            </Link>
                         </p>
                     </div>
                 )}
@@ -298,7 +301,7 @@ function Integracoes() {
                     </div>
                 )}
 
-                {!loading && catalogo && <CatalogoMeta slug={catalogo.slug} temCep={catalogo.temCep} leitura={catalogo} />}
+                {!loading && catalogo && <CatalogoMeta slug={catalogo.slug} temCep={catalogo.temCep} leitura={catalogo} liberado={liberado} />}
             </PageContainer>
         </RouteGuard>
     )

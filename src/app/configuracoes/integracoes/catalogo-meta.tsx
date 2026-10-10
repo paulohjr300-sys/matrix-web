@@ -56,11 +56,27 @@ export function CatalogoMeta({
     slug,
     temCep,
     leitura,
+    liberado = true,
 }: {
     slug: string
     temCep: boolean
+    liberado?: boolean
     leitura?: { lidoEm: string | null; itens: number | null; formato: string | null }
 }) {
+    if (!liberado) {
+        return (
+            <div className="mt-6 rounded-3xl border border-zinc-200 bg-white p-6 shadow-xl shadow-zinc-200/50">
+                <h2 className="text-xl font-bold text-zinc-950">Facebook e Instagram</h2>
+                <p className="mt-3 text-sm leading-6 text-zinc-500">
+                    O catálogo do estoque para anúncios no Facebook e no Instagram faz parte do plano Pro.{' '}
+                    <Link href="/configuracoes/assinatura" className="font-semibold text-brand-600 hover:underline">
+                        Ver planos
+                    </Link>
+                </p>
+            </div>
+        )
+    }
+
     const base = `${typeof window !== 'undefined' ? window.location.origin : ''}/api/catalogo/${slug}`
 
     return (

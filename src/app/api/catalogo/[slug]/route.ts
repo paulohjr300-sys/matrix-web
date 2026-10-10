@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "../../../../lib/supabase-admin";
+import { integrationsAllowed } from "../../../../lib/integrations/core";
 import { lojaGeo } from "../../../../lib/geo";
 
 // Catálogo de veículos da loja no formato da Meta (Facebook/Instagram,
@@ -135,8 +136,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
     .eq("catalogo_meta", false);
 
   const foraDoCatalogo = new Set((removidos || []).map((item) => item.id));
-  // Loja com o site suspenso por falta de pagamento: catálogo vazio.
-  const lista = empresa.site_suspenso
+  // Catálogo é do plano Pro; com o site suspenso ou fora do plano, sai vazio.
+  const lista = empresa.site_suspenso || !(await integrationsAllowed(empresa.id))
     ? []
     : ((veiculos || []) as Veiculo[]).filter((v) => !foraDoCatalogo.has(v.id));
 

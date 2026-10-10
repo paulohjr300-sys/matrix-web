@@ -18,9 +18,11 @@ type Situacao = {
 export function CatalogoMetaVeiculo({
     vehicleId,
     leituraMeta,
+    liberado = true,
     onMessage,
 }: {
     vehicleId: string
+    liberado?: boolean
     leituraMeta: { lidoEm: string | null; itens: number | null } | null
     onMessage: (type: 'success' | 'error', title: string, description?: string) => void
 }) {
@@ -81,6 +83,8 @@ export function CatalogoMetaVeiculo({
         )
         await load()
     }
+
+    if (!liberado) return null
 
     if (!situacao) return null
 
