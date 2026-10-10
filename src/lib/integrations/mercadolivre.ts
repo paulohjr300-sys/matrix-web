@@ -313,6 +313,9 @@ export function missingForMercadoLivre(vehicle: VehicleForListing, empresa: Empr
   if (!vehicle.fuel || !FUEL_MAP[key(vehicle.fuel)]) missing.push("combustível");
   if (!vehicle.advertised_price) missing.push("valor anunciado");
   if (vehicle.pictures.length === 0) missing.push("ao menos uma foto");
+  if ((empresa.cep || "").replace(/\D/g, "").length !== 8) {
+    missing.push("CEP da loja (Configurações > Identidade do site)");
+  }
   if ((empresa.whatsapp || "").replace(/\D/g, "").length < 12) {
     missing.push("WhatsApp da loja (Configurações > Identidade do site)");
   }
@@ -368,9 +371,59 @@ function buildTitle(vehicle: VehicleForListing) {
     .trim();
 }
 
-function buildItem(vehicle: VehicleForListing, empresa: Empresa) {
+type Location = {
+  address_line: string;
+  zip_code: string;
+  neighborhood: { name: string };
+  city: { name: string };
+  state: { id: string; name: string };
+  country: { id: string; name: string };
+};
+
+// O ML exige a localização até o nível da cidade. Ela vem do CEP da loja
+// pelo ViaCEP (consulta pública de CEP).
+async function resolveLocation(empresa: Empresa): Promise<Location> {
   const cep = (empresa.cep || "").replace(/\D/g, "");
 
+  if (cep.length !== 8) {
+    throw new PortalError("Cadastre o CEP da loja em Configurações > Identidade do site.");
+  }
+
+  let data: {
+    erro?: unknown;
+    logradouro?: string;
+    bairro?: string;
+    localidade?: string;
+    uf?: string;
+    estado?: string;
+  } | null = null;
+
+  try {
+    const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`, {
+      next: { revalidate: 7 * 24 * 60 * 60 },
+    });
+    data = await response.json();
+  } catch {
+    throw new PortalError("Não foi possível consultar o CEP da loja agora. Tente novamente em instantes.");
+  }
+
+  if (!data || data.erro || !data.localidade || !data.uf) {
+    throw new PortalError(
+      `O CEP ${cep.replace(/^(\d{5})(\d{3})$/, "$1-$2")} não foi encontrado. Confira o CEP da loja em Configurações > Identidade do site.`,
+    );
+  }
+
+  return {
+    address_line: empresa.endereco || data.logradouro || data.localidade,
+    zip_code: cep,
+    neighborhood: { name: data.bairro || "" },
+    city: { name: data.localidade },
+    state: { id: `BR-${data.uf}`, name: data.estado || data.uf },
+    country: { id: "BR", name: "Brasil" },
+  };
+}
+
+function buildItem(vehicle: VehicleForListing, empresa: Empresa, location: Location) {
   return {
     title: buildTitle(vehicle),
     category_id: CATEGORY_CARS,
@@ -382,10 +435,7 @@ function buildItem(vehicle: VehicleForListing, empresa: Empresa) {
     condition: "used",
     pictures: vehicle.pictures.slice(0, 30).map((source) => ({ source })),
     seller_contact: buildSellerContact(empresa),
-    // Sem CEP, o ML usa o endereço cadastrado na conta do vendedor.
-    ...(cep.length === 8
-      ? { location: { address_line: empresa.endereco || "", zip_code: cep } }
-      : {}),
+    location,
     attributes: buildAttributes(vehicle),
   };
 }
@@ -419,9 +469,11 @@ export async function runMercadoLivre(empresaId: string, vehicleId: string, acti
         throw new PortalError(`Complete antes de publicar: ${missing.join(", ")}.`);
       }
 
+      const location = await resolveLocation(empresa);
+
       const item = await mlFetch(token, "/items", {
         method: "POST",
-        body: JSON.stringify(buildItem(vehicle, empresa)),
+        body: JSON.stringify(buildItem(vehicle, empresa, location)),
       });
 
       if (vehicle.description?.trim()) {
@@ -445,7 +497,7 @@ export async function runMercadoLivre(empresaId: string, vehicleId: string, acti
     }
 
     if (action === "atualizar") {
-      const item = buildItem(vehicle, empresa);
+      const item = buildItem(vehicle, empresa, await resolveLocation(empresa));
 
       await mlFetch(token, `/items/${anuncio.external_id}`, {
         method: "PUT",
@@ -454,6 +506,7 @@ export async function runMercadoLivre(empresaId: string, vehicleId: string, acti
           price: item.price,
           pictures: item.pictures,
           seller_contact: item.seller_contact,
+          location: item.location,
           attributes: item.attributes,
         }),
       });
