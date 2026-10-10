@@ -142,4 +142,12 @@ export async function loadVehicleForListing(empresaId: string, vehicleId: string
   } satisfies VehicleForListing;
 }
 
-export class PortalError extends Error {}
+export class PortalError extends Error {
+  // Código HTTP devolvido pelo portal, quando houver.
+  status?: number;
+
+  constructor(message: string, status?: number) {
+    super(message);
+    this.status = status;
+  }
+}

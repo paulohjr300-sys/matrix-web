@@ -271,6 +271,7 @@ export async function mlFetch(token: string, path: string, init: RequestInit = {
     if (response.status === 402) {
       throw new PortalError(
         "A conta do Mercado Livre não tem um pacote de anúncios de veículos ativo (ou as cotas acabaram). Contrate um pacote com o Mercado Livre e tente publicar de novo.",
+        402,
       );
     }
 
@@ -284,6 +285,7 @@ export async function mlFetch(token: string, path: string, init: RequestInit = {
 
     throw new PortalError(
       [data?.message || data?.error || `Erro ${response.status} no Mercado Livre`, ...causes].join(" — "),
+      response.status,
     );
   }
 
@@ -479,10 +481,34 @@ export async function runMercadoLivre(empresaId: string, vehicleId: string, acti
 
       const location = await resolveLocation(empresa);
 
-      const item = await mlFetch(token, "/items", {
-        method: "POST",
-        body: JSON.stringify(buildItem(vehicle, empresa, location)),
-      });
+      const payload = JSON.stringify(buildItem(vehicle, empresa, location));
+      let item;
+
+      try {
+        item = await mlFetch(token, "/items", { method: "POST", body: payload });
+      } catch (error) {
+        // Sem pacote, o ML recusa antes de olhar o anúncio. O /items/validate
+        // confere todo o resto sem publicar: assim o lojista sabe se só
+        // falta o pacote ou se há dados a corrigir.
+        if (!(error instanceof PortalError) || error.status !== 402) throw error;
+
+        try {
+          await mlFetch(token, "/items/validate", { method: "POST", body: payload });
+        } catch (validation) {
+          if (validation instanceof PortalError && validation.status !== 402) {
+            throw new PortalError(
+              `Falta um pacote de anúncios de veículos na conta do Mercado Livre e o anúncio ainda tem pendências: ${validation.message}`,
+              402,
+            );
+          }
+          throw error;
+        }
+
+        throw new PortalError(
+          "Anúncio conferido pelo Mercado Livre: os dados estão corretos. Para publicar, falta só um pacote de anúncios de veículos ativo na conta do Mercado Livre.",
+          402,
+        );
+      }
 
       if (vehicle.description?.trim()) {
         await mlFetch(token, `/items/${item.id}/description`, {
