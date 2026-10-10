@@ -101,7 +101,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
 
   const { data: empresa } = await supabaseAdmin
     .from("empresas")
-    .select("id, slug, nome, dominio, telefone, whatsapp, endereco, cep, latitude, longitude, geo_cep, ativo")
+    .select("id, slug, nome, dominio, telefone, whatsapp, endereco, cep, latitude, longitude, geo_cep, ativo, site_suspenso")
     .eq("slug", slug)
     .maybeSingle();
 
@@ -135,7 +135,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
     .eq("catalogo_meta", false);
 
   const foraDoCatalogo = new Set((removidos || []).map((item) => item.id));
-  const lista = ((veiculos || []) as Veiculo[]).filter((v) => !foraDoCatalogo.has(v.id));
+  // Loja com o site suspenso por falta de pagamento: catálogo vazio.
+  const lista = empresa.site_suspenso
+    ? []
+    : ((veiculos || []) as Veiculo[]).filter((v) => !foraDoCatalogo.has(v.id));
 
   const { data: imagens } = lista.length
     ? await supabaseAdmin

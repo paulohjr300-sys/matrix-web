@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requirePlatformAdmin } from "../../../../../lib/platform-admin";
 import { supabaseAdmin } from "../../../../../lib/supabase-admin";
+import { atualizarSuspensao } from "../../../../../lib/billing/assinatura";
 
 const PLANOS = ["basico", "pro"];
 const STATUS = ["trial", "ativa", "inadimplente", "cancelada"];
@@ -86,6 +87,9 @@ export async function PATCH(
   if (!data) {
     return NextResponse.json({ message: "Loja não encontrada." }, { status: 404 });
   }
+
+  // Status ou teste alterados à mão: o site da loja acompanha o bloqueio.
+  await atualizarSuspensao(id).catch((error) => console.error(error));
 
   return NextResponse.json({ success: true });
 }

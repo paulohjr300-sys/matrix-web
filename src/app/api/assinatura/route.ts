@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "../../../lib/auth-server";
 import { asaasConfigurado, AsaasError } from "../../../lib/billing/asaas";
-import { assinar, FORMAS_PAGAMENTO, situacaoDaLoja, type FormaPagamento } from "../../../lib/billing/assinatura";
+import { assinar, atualizarSuspensao, FORMAS_PAGAMENTO, situacaoDaLoja, type FormaPagamento } from "../../../lib/billing/assinatura";
 import { PLANOS, type PlanoId } from "../../../lib/planos";
 
 export const maxDuration = 30;
@@ -13,6 +13,8 @@ export async function GET() {
   if (!auth.ok) return auth.response;
 
   try {
+    // Aproveita a consulta para manter o site da loja em dia com o bloqueio.
+    await atualizarSuspensao(auth.empresaId).catch((error) => console.error(error));
     const situacao = await situacaoDaLoja(auth.empresaId);
     const admin = auth.role === "ADMIN";
 
@@ -79,6 +81,8 @@ export async function POST(request: Request) {
       formaPagamento,
       cpfCnpj: typeof body.cpfCnpj === "string" ? body.cpfCnpj : undefined,
     });
+
+    await atualizarSuspensao(auth.empresaId).catch((error) => console.error(error));
 
     return NextResponse.json(resultado);
   } catch (error) {

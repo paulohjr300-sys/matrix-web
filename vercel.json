@@ -3,6 +3,10 @@
     {
       "path": "/api/integracoes/reconciliar",
       "schedule": "0 10 * * *"
+    },
+    {
+      "path": "/api/assinatura/verificar",
+      "schedule": "0 9 * * *"
     }
   ]
 }

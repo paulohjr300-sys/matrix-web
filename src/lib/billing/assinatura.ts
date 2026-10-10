@@ -25,6 +25,7 @@ type Empresa = {
   plano: PlanoId;
   assinatura_status: "trial" | "ativa" | "inadimplente" | "cancelada";
   trial_termina_em: string | null;
+  site_suspenso: boolean;
 };
 
 type Assinatura = {
@@ -89,7 +90,7 @@ async function carregar(empresaId: string) {
   const [{ data: empresa }, { data: assinatura }, { data: pagamentos }] = await Promise.all([
     supabaseAdmin
       .from("empresas")
-      .select("id, nome, email, whatsapp, ativo, plano, assinatura_status, trial_termina_em")
+      .select("id, nome, email, whatsapp, ativo, plano, assinatura_status, trial_termina_em, site_suspenso")
       .eq("id", empresaId)
       .single(),
     supabaseAdmin.from("assinaturas").select("*").eq("empresa_id", empresaId).maybeSingle(),
@@ -167,6 +168,22 @@ export async function situacaoDaLoja(empresaId: string) {
     bloqueado,
     motivo,
   };
+}
+
+// Liga ou desliga o site público da loja junto com o bloqueio do painel.
+export async function atualizarSuspensao(empresaId: string) {
+  const situacao = await situacaoDaLoja(empresaId);
+
+  if (situacao.bloqueado !== situacao.empresa.site_suspenso) {
+    const { error } = await supabaseAdmin
+      .from("empresas")
+      .update({ site_suspenso: situacao.bloqueado })
+      .eq("id", empresaId);
+
+    if (error) throw new Error(`Erro ao atualizar o site da loja: ${error.message}`);
+  }
+
+  return situacao.bloqueado;
 }
 
 export async function salvarPagamento(empresaId: string, pagamento: AsaasPagamento) {
@@ -383,6 +400,7 @@ export async function processarEvento(evento: {
 
     await salvarPagamento(empresaId, pagamento);
     await recalcularStatus(empresaId);
+    await atualizarSuspensao(empresaId);
     return;
   }
 
@@ -402,6 +420,7 @@ export async function processarEvento(evento: {
         .update({ asaas_subscription_id: null, proximo_vencimento: null, updated_at: new Date().toISOString() })
         .eq("empresa_id", empresaId);
       await supabaseAdmin.from("empresas").update({ assinatura_status: "cancelada" }).eq("id", empresaId);
+      await atualizarSuspensao(empresaId);
       return;
     }
 
