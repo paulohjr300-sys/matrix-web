@@ -9,6 +9,7 @@ import {
   CircleDollarSign,
   FileText,
   LayoutDashboard,
+  KanbanSquare,
   Settings,
   Calculator,
   LogOut,
@@ -26,6 +27,12 @@ const menus = [
     label: 'Dashboard',
     href: '/dashboard',
     icon: LayoutDashboard,
+    roles: ['ADMIN', 'GERENTE', 'VENDEDOR'],
+  },
+  {
+    label: 'Funil de vendas',
+    href: '/crm',
+    icon: KanbanSquare,
     roles: ['ADMIN', 'GERENTE', 'VENDEDOR'],
   },
   {

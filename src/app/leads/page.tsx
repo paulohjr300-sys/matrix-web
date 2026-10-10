@@ -12,6 +12,7 @@ type LeadStatus =
     | 'NOVO'
     | 'EM_ATENDIMENTO'
     | 'PROPOSTA_ENVIADA'
+    | 'NEGOCIACAO'
     | 'FECHADO'
     | 'PERDIDO'
 
@@ -67,6 +68,7 @@ const leadStatusOptions: { label: string; value: LeadStatus }[] = [
     { label: 'Novo', value: 'NOVO' },
     { label: 'Em atendimento', value: 'EM_ATENDIMENTO' },
     { label: 'Proposta enviada', value: 'PROPOSTA_ENVIADA' },
+    { label: 'Negociação', value: 'NEGOCIACAO' },
     { label: 'Fechado', value: 'FECHADO' },
     { label: 'Perdido', value: 'PERDIDO' },
 ]

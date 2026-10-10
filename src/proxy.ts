@@ -1,7 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
+// "/" é a landing page da plataforma.
 const publicRoutes = [
+  "/",
   "/login",
   "/reset-password",
   "/cadastro",
@@ -15,6 +17,7 @@ const sharedRoutes = ["/alterar-senha"];
 const roleAccess = {
   ADMIN: [
     "/dashboard",
+    "/crm",
     "/leads",
     "/veiculos",
     "/vendas",
@@ -25,6 +28,7 @@ const roleAccess = {
   ],
   GERENTE: [
     "/dashboard",
+    "/crm",
     "/leads",
     "/veiculos",
     "/vendas",
@@ -32,7 +36,7 @@ const roleAccess = {
     "/dre",
     "/relatorios",
   ],
-  VENDEDOR: ["/dashboard", "/leads", "/veiculos", "/vendas"],
+  VENDEDOR: ["/dashboard", "/crm", "/leads", "/veiculos", "/vendas"],
 };
 
 function matchesRoute(pathname: string, route: string) {
@@ -116,7 +120,7 @@ export async function proxy(request: NextRequest) {
     return response;
   }
 
-  if (user && (pathname === "/login" || pathname === "/cadastro")) {
+  if (user && (pathname === "/" || pathname === "/login" || pathname === "/cadastro")) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
