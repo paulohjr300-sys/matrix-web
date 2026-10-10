@@ -13,6 +13,7 @@ import { getEmpresaId, tenantFilePath } from '../../../lib/tenant'
 type Identidade = {
     nome: string
     logo_url: string
+    favicon_url: string
     cor_primaria: string
     cor_escura: string
     slogan: string
@@ -30,6 +31,7 @@ type Identidade = {
 const EMPTY: Identidade = {
     nome: '',
     logo_url: '',
+    favicon_url: '',
     cor_primaria: '#185FA5',
     cor_escura: '#042C53',
     slogan: '',
@@ -56,8 +58,29 @@ const PALETAS = [
 ]
 
 const HEX_COLOR = /^#[0-9a-f]{6}$/i
-const LOGO_TYPES = ['image/png', 'image/jpeg', 'image/webp']
-const LOGO_MAX_SIZE = 2 * 1024 * 1024
+type ImageField = 'logo_url' | 'favicon_url'
+
+const IMAGE_RULES: Record<
+    ImageField,
+    { label: string; prefix: string; types: string[]; formats: string; maxSize: number; maxSizeLabel: string }
+> = {
+    logo_url: {
+        label: 'logo',
+        prefix: 'logo',
+        types: ['image/png', 'image/jpeg', 'image/webp'],
+        formats: 'PNG, JPG ou WEBP',
+        maxSize: 2 * 1024 * 1024,
+        maxSizeLabel: '2 MB',
+    },
+    favicon_url: {
+        label: 'ícone',
+        prefix: 'favicon',
+        types: ['image/png', 'image/x-icon', 'image/vnd.microsoft.icon', 'image/webp'],
+        formats: 'PNG, ICO ou WEBP',
+        maxSize: 512 * 1024,
+        maxSizeLabel: '512 KB',
+    },
+}
 
 const inputClass =
     'mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10'
@@ -76,7 +99,7 @@ export default function IdentidadePage() {
     const [form, setForm] = useState<Identidade>(EMPTY)
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
-    const [uploading, setUploading] = useState(false)
+    const [uploading, setUploading] = useState<ImageField | null>(null)
 
     const [toast, setToast] = useState({
         open: false,
@@ -121,37 +144,39 @@ export default function IdentidadePage() {
         void loadIdentidade()
     }, [])
 
-    async function handleLogoUpload(file: File) {
-        if (!LOGO_TYPES.includes(file.type)) {
-            showToast('error', 'Formato inválido', 'Envie o logo em PNG, JPG ou WEBP.')
+    async function handleImageUpload(field: ImageField, file: File) {
+        const rules = IMAGE_RULES[field]
+
+        if (!rules.types.includes(file.type)) {
+            showToast('error', 'Formato inválido', `Envie o ${rules.label} em ${rules.formats}.`)
             return
         }
 
-        if (file.size > LOGO_MAX_SIZE) {
-            showToast('error', 'Arquivo grande', 'O logo deve ter no máximo 2 MB.')
+        if (file.size > rules.maxSize) {
+            showToast('error', 'Arquivo grande', `O ${rules.label} deve ter no máximo ${rules.maxSizeLabel}.`)
             return
         }
 
-        setUploading(true)
+        setUploading(field)
 
         try {
             const extension = file.name.split('.').pop()?.toLowerCase() || 'png'
-            const filePath = await tenantFilePath(`logo-${Date.now()}.${extension}`)
+            const filePath = await tenantFilePath(`${rules.prefix}-${Date.now()}.${extension}`)
 
             const { error } = await supabase.storage
                 .from('site-banners')
-                .upload(filePath, file, { cacheControl: '3600', upsert: false })
+                .upload(filePath, file, { cacheControl: '3600', upsert: false, contentType: file.type })
 
             if (error) throw error
 
             const { data } = supabase.storage.from('site-banners').getPublicUrl(filePath)
 
-            setField('logo_url', data.publicUrl)
-            showToast('success', 'Logo enviado', 'Clique em "Salvar" para publicar no site.')
+            setField(field, data.publicUrl)
+            showToast('success', 'Imagem enviada', 'Clique em "Salvar" para publicar no site.')
         } catch {
-            showToast('error', 'Erro', 'Não foi possível enviar o logo.')
+            showToast('error', 'Erro', `Não foi possível enviar o ${rules.label}.`)
         } finally {
-            setUploading(false)
+            setUploading(null)
         }
     }
 
@@ -213,7 +238,7 @@ export default function IdentidadePage() {
                     <button
                         type="button"
                         onClick={() => void handleSave()}
-                        disabled={saving || loading || uploading}
+                        disabled={saving || loading || uploading !== null}
                         className="rounded-2xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-brand-600/20 transition-all hover:-translate-y-0.5 hover:bg-brand-700 disabled:opacity-50"
                     >
                         {saving ? 'Salvando...' : 'Salvar'}
@@ -252,52 +277,27 @@ export default function IdentidadePage() {
                                     />
                                 </Field>
 
-                                <div>
-                                    <span className="text-sm font-medium text-zinc-700">Logo</span>
+                                <ImageUpload
+                                    label="Logo"
+                                    field="logo_url"
+                                    value={form.logo_url}
+                                    uploading={uploading}
+                                    previewClassName="h-20 w-48"
+                                    hint="PNG, JPG ou WEBP até 2 MB. Prefira fundo transparente e versão clara, porque o cabeçalho do site usa a cor escura. Sem logo, o site mostra o nome da loja."
+                                    onUpload={handleImageUpload}
+                                    onRemove={() => setField('logo_url', '')}
+                                />
 
-                                    <div className="mt-2 flex flex-wrap items-center gap-4">
-                                        <div className="flex h-20 w-48 items-center justify-center rounded-2xl border border-dashed border-zinc-300 bg-zinc-50 p-3">
-                                            {form.logo_url ? (
-                                                // eslint-disable-next-line @next/next/no-img-element
-                                                <img src={form.logo_url} alt="Logo da loja" className="max-h-full max-w-full object-contain" />
-                                            ) : (
-                                                <ImageIcon className="text-zinc-400" />
-                                            )}
-                                        </div>
-
-                                        <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-brand-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-brand-700">
-                                            <Upload size={16} />
-                                            {uploading ? 'Enviando...' : 'Enviar logo'}
-                                            <input
-                                                type="file"
-                                                accept={LOGO_TYPES.join(',')}
-                                                className="hidden"
-                                                disabled={uploading}
-                                                onChange={(e) => {
-                                                    const file = e.target.files?.[0]
-                                                    e.target.value = ''
-                                                    if (file) void handleLogoUpload(file)
-                                                }}
-                                            />
-                                        </label>
-
-                                        {form.logo_url && (
-                                            <button
-                                                type="button"
-                                                onClick={() => setField('logo_url', '')}
-                                                className="rounded-xl bg-red-50 p-3 text-red-600 transition hover:bg-red-100"
-                                                aria-label="Remover logo"
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
-                                        )}
-                                    </div>
-
-                                    <p className="mt-2 text-xs text-zinc-500">
-                                        PNG, JPG ou WEBP até 2 MB. Prefira fundo transparente e versão clara, porque o
-                                        cabeçalho do site usa a cor escura. Sem logo, o site mostra o nome da loja.
-                                    </p>
-                                </div>
+                                <ImageUpload
+                                    label="Ícone da aba do navegador (favicon)"
+                                    field="favicon_url"
+                                    value={form.favicon_url}
+                                    uploading={uploading}
+                                    previewClassName="h-20 w-20"
+                                    hint="Imagem quadrada, de preferência PNG 512×512 px, até 512 KB. Aparece na aba do navegador e nos favoritos. Sem ícone, o site usa o logo."
+                                    onUpload={handleImageUpload}
+                                    onRemove={() => setField('favicon_url', '')}
+                                />
                             </Section>
 
                             <Section title="Cores">
@@ -418,16 +418,23 @@ export default function IdentidadePage() {
                                 </div>
                             </Section>
 
-                            <Section title="Google e compartilhamento">
-                                <Field label="Título do site">
+                            <Section title="Aba do navegador e Google">
+                                <Field label="Título do site (aparece na aba do navegador e no Google)">
                                     <input
                                         value={form.site_titulo}
                                         onChange={(e) => setField('site_titulo', e.target.value)}
                                         placeholder={form.nome || 'Nome da loja'}
+                                        maxLength={70}
                                         className={inputClass}
                                     />
                                 </Field>
-                                <Field label="Descrição">
+
+                                <BrowserTabPreview
+                                    title={form.site_titulo.trim() || form.nome.trim() || 'Sua loja'}
+                                    icon={form.favicon_url || form.logo_url}
+                                />
+
+                                <Field label="Descrição (aparece abaixo do título no Google e ao compartilhar no WhatsApp)">
                                     <textarea
                                         value={form.site_descricao}
                                         onChange={(e) => setField('site_descricao', e.target.value)}
@@ -562,6 +569,92 @@ function SitePreview({ form }: { form: Identidade }) {
                 <p className="font-bold text-white">{nome}</p>
                 {form.slogan && <p className="mt-1">{form.slogan}</p>}
                 {form.telefone && <p className="mt-1">{form.telefone}</p>}
+            </div>
+        </div>
+    )
+}
+
+function ImageUpload({
+    label,
+    field,
+    value,
+    uploading,
+    previewClassName,
+    hint,
+    onUpload,
+    onRemove,
+}: {
+    label: string
+    field: ImageField
+    value: string
+    uploading: ImageField | null
+    previewClassName: string
+    hint: string
+    onUpload: (field: ImageField, file: File) => Promise<void>
+    onRemove: () => void
+}) {
+    const isUploading = uploading === field
+
+    return (
+        <div>
+            <span className="text-sm font-medium text-zinc-700">{label}</span>
+
+            <div className="mt-2 flex flex-wrap items-center gap-4">
+                <div className={`flex items-center justify-center rounded-2xl border border-dashed border-zinc-300 bg-zinc-50 p-3 ${previewClassName}`}>
+                    {value ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={value} alt={label} className="max-h-full max-w-full object-contain" />
+                    ) : (
+                        <ImageIcon className="text-zinc-400" />
+                    )}
+                </div>
+
+                <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-brand-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-brand-700">
+                    <Upload size={16} />
+                    {isUploading ? 'Enviando...' : 'Enviar imagem'}
+                    <input
+                        type="file"
+                        accept={IMAGE_RULES[field].types.join(',')}
+                        className="hidden"
+                        disabled={uploading !== null}
+                        onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            e.target.value = ''
+                            if (file) void onUpload(field, file)
+                        }}
+                    />
+                </label>
+
+                {value && (
+                    <button
+                        type="button"
+                        onClick={onRemove}
+                        className="rounded-xl bg-red-50 p-3 text-red-600 transition hover:bg-red-100"
+                        aria-label={`Remover ${label.toLowerCase()}`}
+                    >
+                        <Trash2 size={16} />
+                    </button>
+                )}
+            </div>
+
+            <p className="mt-2 text-xs text-zinc-500">{hint}</p>
+        </div>
+    )
+}
+
+// Como a aba do navegador vai aparecer com o título e o ícone escolhidos.
+function BrowserTabPreview({ title, icon }: { title: string; icon: string }) {
+    return (
+        <div className="rounded-2xl bg-zinc-200 px-3 pt-2">
+            <div className="flex w-full max-w-xs items-center gap-2 rounded-t-xl bg-white px-3 py-2 text-xs text-zinc-700 shadow-sm">
+                {icon ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={icon} alt="" className="h-4 w-4 shrink-0 object-contain" />
+                ) : (
+                    <span className="h-4 w-4 shrink-0 rounded-full bg-zinc-300" />
+                )}
+                <span className="truncate">{title}</span>
+                <span className="ml-auto text-zinc-400">×</span>
             </div>
         </div>
     )
