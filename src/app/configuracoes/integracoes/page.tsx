@@ -11,6 +11,7 @@ import { Toast } from '../../components/ui/toast'
 import { ConfirmDialog } from '../../components/ui/confirm-dialog'
 import { PacotesMercadoLivre } from './pacotes-ml'
 import { PlanoOlx } from './plano-olx'
+import { CatalogoMeta } from './catalogo-meta'
 
 type Conexao = {
     status: 'conectado' | 'erro' | 'desconectado'
@@ -47,6 +48,7 @@ function Integracoes() {
     const [portais, setPortais] = useState<PortalInfo[]>([])
     const [liberado, setLiberado] = useState(true)
     const [usuarioTeste, setUsuarioTeste] = useState(false)
+    const [catalogo, setCatalogo] = useState<{ slug: string; temCep: boolean } | null>(null)
     const [criandoTeste, setCriandoTeste] = useState(false)
     const [contaTeste, setContaTeste] = useState<{ nickname: string; password: string; email: string | null } | null>(null)
     const [loading, setLoading] = useState(true)
@@ -73,6 +75,7 @@ function Integracoes() {
             setPortais(result.portais || [])
             setLiberado(result.liberado !== false)
             setUsuarioTeste(result.usuarioTeste === true)
+            setCatalogo(result.catalogo || null)
         } else {
             showToast('error', 'Erro', result.message || 'Não foi possível carregar as integrações.')
         }
@@ -294,6 +297,8 @@ function Integracoes() {
                         })}
                     </div>
                 )}
+
+                {!loading && catalogo && <CatalogoMeta slug={catalogo.slug} temCep={catalogo.temCep} />}
             </PageContainer>
         </RouteGuard>
     )
