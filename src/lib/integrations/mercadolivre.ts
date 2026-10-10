@@ -459,16 +459,22 @@ const LISTING_TYPE_PREFERENCE = ["silver", "gold", "gold_special", "gold_premium
 
 async function chooseListingType(token: string, empresaId: string) {
   const integracao = await getIntegracao(empresaId, "mercadolivre");
-  if (!integracao?.conta_externa_id) return "silver";
+  if (!integracao?.conta_externa_id) return { id: "silver", info: "conta sem id" };
 
   try {
     const types = await availableListingTypes(token, integracao.conta_externa_id);
     const ids = types.filter((type) => type.remaining === null || type.remaining > 0).map((type) => type.id);
+    const info = types.length
+      ? types.map((type) => `${type.id}${type.remaining !== null ? ` (${type.remaining})` : ""}`).join(", ")
+      : "nenhum";
 
-    return LISTING_TYPE_PREFERENCE.find((id) => ids.includes(id)) || ids[0] || "silver";
-  } catch {
+    return { id: LISTING_TYPE_PREFERENCE.find((id) => ids.includes(id)) || ids[0] || "silver", info };
+  } catch (error) {
     // Se a consulta falhar, segue com o padrão de pacote.
-    return "silver";
+    return {
+      id: "silver",
+      info: `consulta falhou: ${error instanceof Error ? error.message : "erro"}`,
+    };
   }
 }
 
@@ -526,7 +532,9 @@ export async function runMercadoLivre(empresaId: string, vehicleId: string, acti
       const location = await resolveLocation(empresa);
 
       const listingType = await chooseListingType(token, empresaId);
-      const payload = JSON.stringify(buildItem(vehicle, empresa, location, listingType));
+      const payload = JSON.stringify(buildItem(vehicle, empresa, location, listingType.id));
+      // Mostrado junto dos erros de pacote para saber o que o ML ofereceu.
+      const diagnostico = ` [tipo usado: ${listingType.id}; tipos da conta: ${listingType.info}]`;
       let item;
 
       try {
@@ -542,15 +550,16 @@ export async function runMercadoLivre(empresaId: string, vehicleId: string, acti
         } catch (validation) {
           if (validation instanceof PortalError && validation.status !== 402) {
             throw new PortalError(
-              `Falta um pacote de anúncios de veículos na conta do Mercado Livre e o anúncio ainda tem pendências: ${validation.message}`,
+              `Falta um pacote de anúncios de veículos na conta do Mercado Livre e o anúncio ainda tem pendências: ${validation.message}` + diagnostico,
               402,
             );
           }
-          throw error;
+          throw new PortalError(error.message + diagnostico, 402);
         }
 
         throw new PortalError(
-          "Anúncio conferido pelo Mercado Livre: os dados estão corretos. Para publicar, falta só um pacote de anúncios de veículos ativo na conta do Mercado Livre.",
+          "Anúncio conferido pelo Mercado Livre: os dados estão corretos. Para publicar, falta só um pacote de anúncios de veículos ativo na conta do Mercado Livre." +
+            diagnostico,
           402,
         );
       }
