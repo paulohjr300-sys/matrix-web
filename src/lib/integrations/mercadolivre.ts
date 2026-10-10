@@ -457,22 +457,34 @@ export async function availableListingTypes(token: string, userId: string): Prom
 
 const LISTING_TYPE_PREFERENCE = ["silver", "gold", "gold_special", "gold_premium", "free"];
 
+function rank(id: string) {
+  const index = LISTING_TYPE_PREFERENCE.indexOf(id);
+  return index === -1 ? LISTING_TYPE_PREFERENCE.length : index;
+}
+
 async function chooseListingType(token: string, empresaId: string) {
   const integracao = await getIntegracao(empresaId, "mercadolivre");
-  if (!integracao?.conta_externa_id) return { id: "silver", info: "conta sem id" };
+  if (!integracao?.conta_externa_id) return { ids: ["silver"], info: "conta sem id" };
 
   try {
     const types = await availableListingTypes(token, integracao.conta_externa_id);
-    const ids = types.filter((type) => type.remaining === null || type.remaining > 0).map((type) => type.id);
     const info = types.length
       ? types.map((type) => `${type.id}${type.remaining !== null ? ` (${type.remaining})` : ""}`).join(", ")
       : "nenhum";
 
-    return { id: LISTING_TYPE_PREFERENCE.find((id) => ids.includes(id)) || ids[0] || "silver", info };
+    // Primeiro os tipos com cota disponível informada pelo ML (ex.: "free (1)"
+    // da pessoa física); depois os sem contagem, que dependem de pacote.
+    const byPreference = (a: ListingTypeDisponivel, b: ListingTypeDisponivel) =>
+      rank(a.id) - rank(b.id);
+    const comCota = types.filter((type) => type.remaining !== null && type.remaining > 0).sort(byPreference);
+    const semContagem = types.filter((type) => type.remaining === null).sort(byPreference);
+    const ids = [...comCota, ...semContagem].map((type) => type.id);
+
+    return { ids: ids.length ? ids : ["silver"], info };
   } catch (error) {
     // Se a consulta falhar, segue com o padrão de pacote.
     return {
-      id: "silver",
+      ids: ["silver"],
       info: `consulta falhou: ${error instanceof Error ? error.message : "erro"}`,
     };
   }
@@ -531,15 +543,32 @@ export async function runMercadoLivre(empresaId: string, vehicleId: string, acti
 
       const location = await resolveLocation(empresa);
 
-      const listingType = await chooseListingType(token, empresaId);
-      const payload = JSON.stringify(buildItem(vehicle, empresa, location, listingType.id));
-      // Mostrado junto dos erros de pacote para saber o que o ML ofereceu.
-      const diagnostico = ` [tipo usado: ${listingType.id}; tipos da conta: ${listingType.info}]`;
+      const listingTypes = await chooseListingType(token, empresaId);
+      const tentados: string[] = [];
+      let payload = "";
       let item;
+      let ultimoErro: unknown = null;
 
-      try {
-        item = await mlFetch(token, "/items", { method: "POST", body: payload });
-      } catch (error) {
+      // Tenta os tipos em ordem; 402 (sem pacote/cota) passa para o próximo.
+      for (const listingType of listingTypes.ids.slice(0, 4)) {
+        tentados.push(listingType);
+        payload = JSON.stringify(buildItem(vehicle, empresa, location, listingType));
+
+        try {
+          item = await mlFetch(token, "/items", { method: "POST", body: payload });
+          ultimoErro = null;
+          break;
+        } catch (error) {
+          ultimoErro = error;
+          if (!(error instanceof PortalError) || error.status !== 402) break;
+        }
+      }
+
+      // Mostrado junto dos erros de pacote para saber o que o ML ofereceu.
+      const diagnostico = ` [tipos tentados: ${tentados.join(", ")}; tipos da conta: ${listingTypes.info}]`;
+
+      if (ultimoErro) {
+        const error = ultimoErro;
         // Sem pacote, o ML recusa antes de olhar o anúncio. O /items/validate
         // confere todo o resto sem publicar: assim o lojista sabe se só
         // falta o pacote ou se há dados a corrigir.
