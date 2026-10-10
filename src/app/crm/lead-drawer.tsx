@@ -17,6 +17,7 @@ import {
 
 import { supabase } from '../../lib/supabase'
 import { CurrencyInput } from '../components/currency-input'
+import { sincronizarAnuncios } from '../../lib/portal-sync'
 import { ConfirmDialog } from '../components/ui/confirm-dialog'
 import {
     ETAPAS,
@@ -314,11 +315,9 @@ export function LeadDrawer({
             )
 
             // Encerra os anúncios do veículo nos portais.
-            void fetch('/api/integracoes/sincronizar', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ vehicleId: vendaVeiculo }),
-            }).catch(() => null)
+            void sincronizarAnuncios(vendaVeiculo).then((erros) => {
+                if (erros.length) showToast('error', 'Anúncios nos portais', erros.join(' '))
+            })
 
             setVendaAberta(false)
         } catch (error) {

@@ -6,6 +6,7 @@ import { CurrencyInput } from '../components/currency-input'
 import { Toast } from '../components/ui/toast'
 import { ConfirmDialog } from '../components/ui/confirm-dialog'
 import { supabase } from '../../lib/supabase'
+import { sincronizarAnuncios } from '../../lib/portal-sync'
 import { Pencil, Trash2 } from 'lucide-react'
 
 type Vehicle = {
@@ -186,6 +187,11 @@ export default function VendasPage() {
                         is_published: false,
                     })
                     .eq('id', vehicleId)
+
+                // Vendido: encerra os anúncios nos portais.
+                void sincronizarAnuncios(vehicleId).then((erros) => {
+                    if (erros.length) showToast('error', 'Anúncios nos portais', erros.join(' '))
+                })
             }
         }
 
