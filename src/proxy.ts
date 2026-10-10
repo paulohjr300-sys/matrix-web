@@ -1,7 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-const publicRoutes = ["/login", "/reset-password", "/cadastro"];
+const publicRoutes = [
+  "/login",
+  "/reset-password",
+  "/cadastro",
+  "/termos",
+  "/privacidade",
+];
 
 // Rotas liberadas para qualquer usuário autenticado e ativo.
 const sharedRoutes = ["/alterar-senha"];
@@ -95,6 +101,21 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
+  // Área da plataforma: só quem está em platform_admins, com ou sem loja.
+  if (matchesRoute(pathname, "/admin")) {
+    if (!user) {
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
+
+    const { data: isPlatformAdmin } = await supabase.rpc("is_platform_admin");
+
+    if (isPlatformAdmin !== true) {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
+
+    return response;
+  }
+
   if (user && (pathname === "/login" || pathname === "/cadastro")) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
@@ -107,6 +128,15 @@ export async function proxy(request: NextRequest) {
       .single();
 
     if (!profile?.role || profile.is_active === false) {
+      // Admin da plataforma sem loja própria vai para a área da plataforma.
+      if (!profile) {
+        const { data: isPlatformAdmin } = await supabase.rpc("is_platform_admin");
+
+        if (isPlatformAdmin === true) {
+          return NextResponse.redirect(new URL("/admin", request.url));
+        }
+      }
+
       await supabase.auth.signOut();
 
       const redirect = NextResponse.redirect(new URL("/login", request.url));
@@ -128,6 +158,6 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

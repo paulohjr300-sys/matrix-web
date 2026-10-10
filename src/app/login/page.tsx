@@ -51,6 +51,13 @@ export default function LoginPage() {
 
 
         if (profileError || !profile) {
+            const { data: isPlatformAdmin } = await supabase.rpc('is_platform_admin')
+
+            if (isPlatformAdmin === true) {
+                router.push('/admin')
+                return
+            }
+
             await supabase.auth.signOut()
             setMessageType('error')
             setMessage(

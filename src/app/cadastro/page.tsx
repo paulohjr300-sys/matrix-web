@@ -236,8 +236,15 @@ export default function CadastroPage() {
                             className="mt-0.5 h-4 w-4 accent-brand-600"
                         />
                         <span>
-                            Li e aceito os termos de uso e a política de privacidade, e autorizo o
-                            tratamento dos dados informados para a criação da conta.
+                            Li e aceito os{' '}
+                            <Link href="/termos" target="_blank" className="font-semibold text-brand-600 hover:underline">
+                                Termos de Uso
+                            </Link>{' '}
+                            e a{' '}
+                            <Link href="/privacidade" target="_blank" className="font-semibold text-brand-600 hover:underline">
+                                Política de Privacidade
+                            </Link>
+                            .
                         </span>
                     </label>
 
