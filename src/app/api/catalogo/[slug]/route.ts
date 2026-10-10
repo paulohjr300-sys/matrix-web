@@ -127,7 +127,15 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
     .order("created_at", { ascending: false })
     .limit(2000);
 
-  const lista = (veiculos || []) as Veiculo[];
+  // Veículos que o lojista tirou do catálogo (continuam no site).
+  const { data: removidos } = await supabaseAdmin
+    .from("vehicles")
+    .select("id")
+    .eq("empresa_id", empresa.id)
+    .eq("catalogo_meta", false);
+
+  const foraDoCatalogo = new Set((removidos || []).map((item) => item.id));
+  const lista = ((veiculos || []) as Veiculo[]).filter((v) => !foraDoCatalogo.has(v.id));
 
   const { data: imagens } = lista.length
     ? await supabaseAdmin

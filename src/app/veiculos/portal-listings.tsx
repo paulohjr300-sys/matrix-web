@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { ExternalLink, Loader2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { OlxCatalogPicker, type OlxCatalogo } from './olx-catalog-picker'
+import { CatalogoMetaVeiculo } from './catalogo-meta-veiculo'
 
 type Anuncio = {
     portal: string
@@ -59,6 +60,7 @@ export function PortalListings({
     const [anuncios, setAnuncios] = useState<Anuncio[]>([])
     const [running, setRunning] = useState<string | null>(null)
     const [catalogoOlx, setCatalogoOlx] = useState<OlxCatalogo | null>(null)
+    const [leituraMeta, setLeituraMeta] = useState<{ lidoEm: string | null; itens: number | null } | null>(null)
 
     const load = useCallback(async () => {
         const [integracoesResponse, anunciosResult] = await Promise.all([
@@ -71,6 +73,7 @@ export function PortalListings({
 
         setPortais(integracoesResponse?.portais || [])
         setLiberado(integracoesResponse?.liberado !== false)
+        setLeituraMeta(integracoesResponse?.catalogo || null)
         setAnuncios((anunciosResult.data || []) as Anuncio[])
     }, [vehicleId])
 
@@ -237,6 +240,8 @@ export function PortalListings({
                         </div>
                     )
                 })}
+
+                <CatalogoMetaVeiculo vehicleId={vehicleId} leituraMeta={leituraMeta} onMessage={onMessage} />
             </div>
         </div>
     )
