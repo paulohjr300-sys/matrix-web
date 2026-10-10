@@ -9,6 +9,7 @@ import { PageContainer } from '../../components/page-container'
 import { RouteGuard } from '../../components/auth/route-guard'
 import { Toast } from '../../components/ui/toast'
 import { ConfirmDialog } from '../../components/ui/confirm-dialog'
+import { PacotesMercadoLivre } from './pacotes-ml'
 
 type Conexao = {
     status: 'conectado' | 'erro' | 'desconectado'
@@ -224,6 +225,8 @@ function Integracoes() {
                                     {comErro && item.conexao?.ultimo_erro && (
                                         <p className="mt-4 text-sm text-red-700">{item.conexao.ultimo_erro}</p>
                                     )}
+
+                                    {item.portal === 'mercadolivre' && conectado && <PacotesMercadoLivre />}
 
                                     {item.portal === 'mercadolivre' && usuarioTeste && item.conexao?.status === 'conectado' && (
                                         <div className="mt-4 rounded-xl bg-zinc-50 p-3 text-sm ring-1 ring-zinc-200">

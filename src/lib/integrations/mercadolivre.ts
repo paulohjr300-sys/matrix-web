@@ -433,7 +433,51 @@ async function resolveLocation(empresa: Empresa): Promise<Location> {
   };
 }
 
-function buildItem(vehicle: VehicleForListing, empresa: Empresa, location: Location) {
+export type ListingTypeDisponivel = { id: string; name: string; remaining: number | null };
+
+// Tipos de anúncio que a conta pode usar em carros. Conta de loja com
+// pacote usa "silver" (e destaques); conta de pessoa física costuma ter o
+// anúncio grátis ("free"), o mesmo que o site do ML oferece.
+export async function availableListingTypes(token: string, userId: string): Promise<ListingTypeDisponivel[]> {
+  const data = await mlFetch(
+    token,
+    `/users/${userId}/available_listing_types?category_id=${CATEGORY_CARS}`,
+  );
+
+  const list = Array.isArray(data?.available) ? data.available : Array.isArray(data) ? data : [];
+
+  return list
+    .filter((item: { id?: string }) => item?.id)
+    .map((item: { id: string; name?: string; remaining_listings?: number }) => ({
+      id: item.id,
+      name: item.name || item.id,
+      remaining: typeof item.remaining_listings === "number" ? item.remaining_listings : null,
+    }));
+}
+
+const LISTING_TYPE_PREFERENCE = ["silver", "gold", "gold_special", "gold_premium", "free"];
+
+async function chooseListingType(token: string, empresaId: string) {
+  const integracao = await getIntegracao(empresaId, "mercadolivre");
+  if (!integracao?.conta_externa_id) return "silver";
+
+  try {
+    const types = await availableListingTypes(token, integracao.conta_externa_id);
+    const ids = types.filter((type) => type.remaining === null || type.remaining > 0).map((type) => type.id);
+
+    return LISTING_TYPE_PREFERENCE.find((id) => ids.includes(id)) || ids[0] || "silver";
+  } catch {
+    // Se a consulta falhar, segue com o padrão de pacote.
+    return "silver";
+  }
+}
+
+function buildItem(
+  vehicle: VehicleForListing,
+  empresa: Empresa,
+  location: Location,
+  listingType = "silver",
+) {
   return {
     title: buildTitle(vehicle),
     category_id: CATEGORY_CARS,
@@ -441,7 +485,7 @@ function buildItem(vehicle: VehicleForListing, empresa: Empresa, location: Locat
     currency_id: "BRL",
     available_quantity: 1,
     buying_mode: "classified",
-    listing_type_id: "silver",
+    listing_type_id: listingType,
     condition: "used",
     pictures: vehicle.pictures.slice(0, 30).map((source) => ({ source })),
     seller_contact: buildSellerContact(empresa),
@@ -481,7 +525,8 @@ export async function runMercadoLivre(empresaId: string, vehicleId: string, acti
 
       const location = await resolveLocation(empresa);
 
-      const payload = JSON.stringify(buildItem(vehicle, empresa, location));
+      const listingType = await chooseListingType(token, empresaId);
+      const payload = JSON.stringify(buildItem(vehicle, empresa, location, listingType));
       let item;
 
       try {
