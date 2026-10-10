@@ -126,7 +126,18 @@ async function tokenRequest(body: Record<string, string>) {
   const data = await response.json().catch(() => null);
 
   if (!response.ok || !data?.access_token) {
-    throw new PortalError(data?.message || "O Mercado Livre recusou a autorização.");
+    throw new PortalError(
+      [data?.message, data?.error_description || data?.error].filter(Boolean).join(" — ") ||
+        "O Mercado Livre recusou a autorização.",
+    );
+  }
+
+  // Sem o escopo offline_access o ML não envia o refresh_token, e a conexão
+  // cairia em 6 horas.
+  if (!data.refresh_token) {
+    throw new PortalError(
+      "O Mercado Livre não enviou a renovação de acesso. No aplicativo do DevCenter, ative a permissão \"offline_access\" (acesso offline) e conecte de novo.",
+    );
   }
 
   return data as TokenResponse;
@@ -148,7 +159,7 @@ export async function exchangeCode(code: string, codeVerifier: string) {
 export async function saveConnection(empresaId: string, tokens: TokenResponse) {
   const me = await mlFetch(tokens.access_token, "/users/me");
 
-  await supabaseAdmin.from("integracoes").upsert(
+  const { error } = await supabaseAdmin.from("integracoes").upsert(
     {
       empresa_id: empresaId,
       portal: "mercadolivre",
@@ -164,6 +175,10 @@ export async function saveConnection(empresaId: string, tokens: TokenResponse) {
     },
     { onConflict: "empresa_id,portal" },
   );
+
+  if (error) {
+    throw new PortalError(`Não foi possível salvar a conexão: ${error.message}`);
+  }
 }
 
 // Token válido da loja. O refresh_token do ML é de uso único: a gravação

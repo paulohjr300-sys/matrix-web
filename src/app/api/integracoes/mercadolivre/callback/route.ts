@@ -55,7 +55,11 @@ export async function GET(request: NextRequest) {
     await saveConnection(auth.empresaId, tokens);
   } catch (error) {
     if (!(error instanceof PortalError)) console.error("Erro ao conectar o Mercado Livre", error);
-    return fail(error instanceof PortalError ? error.message : "Não foi possível conectar ao Mercado Livre.");
+    return fail(
+      error instanceof PortalError
+        ? error.message
+        : `Não foi possível conectar ao Mercado Livre (${error instanceof Error ? error.message : "erro desconhecido"}).`,
+    );
   }
 
   return finish("conectado=mercadolivre");

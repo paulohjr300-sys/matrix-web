@@ -14,6 +14,20 @@ import {
     X,
 } from 'lucide-react'
 
+import {
+    DndContext,
+    DragOverlay,
+    PointerSensor,
+    TouchSensor,
+    pointerWithin,
+    useDraggable,
+    useDroppable,
+    useSensor,
+    useSensors,
+    type DraggableAttributes,
+    type DraggableSyntheticListeners,
+} from '@dnd-kit/core'
+
 import { PageContainer } from '../components/page-container'
 import { Toast } from '../components/ui/toast'
 import { CurrencyInput } from '../components/currency-input'
@@ -59,7 +73,6 @@ export default function CrmPage() {
 
     const [selecionadoId, setSelecionadoId] = useState<string | null>(null)
     const [arrastandoId, setArrastandoId] = useState<string | null>(null)
-    const [colunaAlvo, setColunaAlvo] = useState<Etapa | null>(null)
     const [perdaPendente, setPerdaPendente] = useState<{ id: string; motivo: string } | null>(null)
     const [novoAberto, setNovoAberto] = useState(false)
     const [agora, setAgora] = useState(() => Date.now())
@@ -115,6 +128,11 @@ export default function CrmPage() {
         const timer = setInterval(() => setAgora(Date.now()), 60 * 1000)
         return () => clearInterval(timer)
     }, [])
+
+    const sensors = useSensors(
+        useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+        useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 6 } })
+    )
 
     function substituir(lead: CrmLead) {
         setLeads((current) => current.map((item) => (item.id === lead.id ? lead : item)))
@@ -330,6 +348,16 @@ export default function CrmPage() {
                 {loading ? (
                     <p className="mt-8 text-sm text-zinc-500">Carregando funil...</p>
                 ) : (
+                    <DndContext
+                        sensors={sensors}
+                        collisionDetection={pointerWithin}
+                        onDragStart={({ active }) => setArrastandoId(String(active.id))}
+                        onDragCancel={() => setArrastandoId(null)}
+                        onDragEnd={({ active, over }) => {
+                            setArrastandoId(null)
+                            if (over) void moverPara(String(active.id), over.id as Etapa)
+                        }}
+                    >
                     <div className="-mx-8 mt-6 overflow-x-auto px-8 pb-4 xl:mx-0 xl:overflow-visible xl:px-0">
                         <div className="flex min-w-max gap-4 xl:grid xl:min-w-0 xl:grid-cols-6 xl:gap-3">
                             {/* Telas grandes: 6 colunas dividindo a largura, sem rolagem lateral. Menores: rolagem lateral. */}
@@ -338,22 +366,7 @@ export default function CrmPage() {
                                 const total = daEtapa.reduce((soma, lead) => soma + valorDoLead(lead), 0)
 
                                 return (
-                                    <div
-                                        key={etapa.value}
-                                        onDragOver={(e) => {
-                                            e.preventDefault()
-                                            setColunaAlvo(etapa.value)
-                                        }}
-                                        onDragLeave={() => setColunaAlvo(null)}
-                                        onDrop={(e) => {
-                                            e.preventDefault()
-                                            setColunaAlvo(null)
-                                            const id = e.dataTransfer.getData('text/plain')
-                                            if (id) void moverPara(id, etapa.value)
-                                        }}
-                                        className={`flex w-72 shrink-0 flex-col rounded-3xl p-3 transition xl:w-auto xl:min-w-0 xl:p-2 ${colunaAlvo === etapa.value ? 'bg-brand-50 ring-2 ring-brand-300' : 'bg-zinc-200/50'
-                                            }`}
-                                    >
+                                    <EtapaColuna key={etapa.value} etapa={etapa.value}>
                                         <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5 px-2 pb-3 pt-1">
                                             <div className="flex min-w-0 items-center gap-2">
                                                 <span className={`h-2.5 w-2.5 rounded-full ${etapa.dot}`} />
@@ -367,19 +380,12 @@ export default function CrmPage() {
 
                                         <div className="flex min-h-[120px] flex-col gap-3">
                                             {daEtapa.map((lead) => (
-                                                <LeadCard
+                                                <CardArrastavel
                                                     key={lead.id}
                                                     lead={lead}
                                                     agora={agora}
                                                     responsavel={nomeMembro(lead.responsavel_id)}
-                                                    arrastando={arrastandoId === lead.id}
                                                     onOpen={() => setSelecionadoId(lead.id)}
-                                                    onDragStart={(e) => {
-                                                        e.dataTransfer.setData('text/plain', lead.id)
-                                                        e.dataTransfer.effectAllowed = 'move'
-                                                        setArrastandoId(lead.id)
-                                                    }}
-                                                    onDragEnd={() => setArrastandoId(null)}
                                                     onMover={(nova) => void moverPara(lead.id, nova)}
                                                 />
                                             ))}
@@ -390,11 +396,26 @@ export default function CrmPage() {
                                                 </p>
                                             )}
                                         </div>
-                                    </div>
+                                    </EtapaColuna>
                                 )
                             })}
                         </div>
                     </div>
+
+                    {/* Cópia sólida do card que acompanha o cursor/dedo. */}
+                    <DragOverlay dropAnimation={null}>
+                        {arrastandoId && leads.find((lead) => lead.id === arrastandoId) ? (
+                            <LeadCard
+                                lead={leads.find((lead) => lead.id === arrastandoId)!}
+                                agora={agora}
+                                responsavel={nomeMembro(leads.find((lead) => lead.id === arrastandoId)!.responsavel_id)}
+                                overlay
+                                onOpen={() => undefined}
+                                onMover={() => undefined}
+                            />
+                        ) : null}
+                    </DragOverlay>
+                    </DndContext>
                 )}
             </PageContainer>
 
@@ -505,23 +526,47 @@ function Indicador({
     )
 }
 
+function EtapaColuna({ etapa, children }: { etapa: Etapa; children: React.ReactNode }) {
+    const { setNodeRef, isOver } = useDroppable({ id: etapa })
+
+    return (
+        <div
+            ref={setNodeRef}
+            className={`flex w-72 shrink-0 flex-col rounded-3xl p-3 transition xl:w-auto xl:min-w-0 xl:p-2 ${isOver ? 'bg-brand-50 ring-2 ring-brand-300' : 'bg-zinc-200/50'
+                }`}
+        >
+            {children}
+        </div>
+    )
+}
+
+function CardArrastavel(props: Omit<Parameters<typeof LeadCard>[0], 'drag' | 'overlay' | 'arrastando'>) {
+    const { setNodeRef, listeners, attributes, isDragging } = useDraggable({ id: props.lead.id })
+
+    return <LeadCard {...props} arrastando={isDragging} drag={{ ref: setNodeRef, listeners, attributes }} />
+}
+
 function LeadCard({
     lead,
     agora,
     responsavel,
-    arrastando,
+    arrastando = false,
+    overlay = false,
+    drag,
     onOpen,
-    onDragStart,
-    onDragEnd,
     onMover,
 }: {
     lead: CrmLead
     agora: number
     responsavel: string | null
-    arrastando: boolean
+    arrastando?: boolean
+    overlay?: boolean
+    drag?: {
+        ref: (element: HTMLElement | null) => void
+        listeners: DraggableSyntheticListeners
+        attributes: DraggableAttributes
+    }
     onOpen: () => void
-    onDragStart: (e: React.DragEvent) => void
-    onDragEnd: () => void
     onMover: (etapa: Etapa) => void
 }) {
     const situacao = situacaoProximaAcao(lead, new Date(agora))
@@ -533,21 +578,18 @@ function LeadCard({
 
     return (
         <article
-            draggable
-            onDragStart={onDragStart}
-            onDragEnd={onDragEnd}
+            ref={drag?.ref}
+            {...drag?.listeners}
+            {...drag?.attributes}
             onClick={onOpen}
-            className={`min-w-0 cursor-pointer rounded-2xl bg-white p-4 shadow-sm xl:p-3 ring-1 transition hover:shadow-md ${sla ? 'ring-red-300' : 'ring-zinc-200'
-                } ${arrastando ? 'opacity-40' : ''}`}
+            className={`min-w-0 touch-manipulation rounded-2xl bg-white p-4 xl:p-3 ring-1 ${overlay
+                ? 'rotate-2 cursor-grabbing shadow-2xl ring-brand-300'
+                : `cursor-pointer shadow-sm transition hover:shadow-md ${sla ? 'ring-red-300' : 'ring-zinc-200'}`
+                } ${arrastando ? 'border-2 border-dashed border-zinc-300 bg-zinc-100 opacity-50 shadow-none' : ''}`}
         >
-            <div className="flex items-start justify-between gap-2">
-                <p className="truncate font-semibold text-zinc-950">{lead.nome || 'Sem nome'}</p>
-                {temperatura && (
-                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ring-1 ${temperatura.className}`}>
-                        {temperatura.label}
-                    </span>
-                )}
-            </div>
+            <p className="truncate font-semibold text-zinc-950" title={lead.nome || undefined}>
+                {lead.nome || 'Sem nome'}
+            </p>
 
             {veiculo && (
                 <p className="mt-1 flex items-center gap-1.5 truncate text-xs text-zinc-600">
@@ -559,6 +601,11 @@ function LeadCard({
             {valor > 0 && <p className="mt-2 text-sm font-bold text-zinc-900">{formatMoney(valor)}</p>}
 
             <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                {temperatura && (
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ring-1 ${temperatura.className}`}>
+                        {temperatura.label}
+                    </span>
+                )}
                 <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-semibold text-zinc-600">
                     {ORIGENS[lead.origem || ''] || lead.origem || 'Sem origem'}
                 </span>
