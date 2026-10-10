@@ -266,6 +266,14 @@ async function mlFetch(token: string, path: string, init: RequestInit = {}): Pro
   const data = await response.json().catch(() => null);
 
   if (!response.ok) {
+    // 402: a conta não tem pacote de publicação de veículos ativo (ou as
+    // cotas acabaram). O pacote é contratado com o comercial do ML.
+    if (response.status === 402) {
+      throw new PortalError(
+        "A conta do Mercado Livre não tem um pacote de anúncios de veículos ativo (ou as cotas acabaram). Contrate um pacote com o Mercado Livre e tente publicar de novo.",
+      );
+    }
+
     // O ML detalha os problemas de validação em "cause".
     const causes = Array.isArray(data?.cause)
       ? data.cause
@@ -275,7 +283,7 @@ async function mlFetch(token: string, path: string, init: RequestInit = {}): Pro
       : [];
 
     throw new PortalError(
-      [data?.message || `Erro ${response.status} no Mercado Livre`, ...causes].join(" — "),
+      [data?.message || data?.error || `Erro ${response.status} no Mercado Livre`, ...causes].join(" — "),
     );
   }
 
