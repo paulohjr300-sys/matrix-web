@@ -236,14 +236,14 @@ export default function VendasPage() {
         <>
             <PageContainer
                 title="Vendas"
-                description="Controle de vendas da Matrix."
+                description="Controle de vendas da loja."
                 action={
                     <button
                         onClick={() => {
                             setShowForm(!showForm)
                             resetForm()
                         }}
-                        className="rounded-2xl bg-red-600 px-5 py-3 text-sm font-semibold text-white"
+                        className="rounded-2xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white"
                     >
                         {showForm ? 'Fechar' : '+ Nova venda'}
                     </button>

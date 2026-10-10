@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../../lib/supabase'
-import { Toast } from '../ui/toast'
 
 type Role = 'ADMIN' | 'GERENTE' | 'VENDEDOR'
 
@@ -42,7 +41,7 @@ export function RouteGuard({ allowedRoles, children }: RouteGuardProps) {
 
             if (!allowedRoles.includes(profile.role)) {
                 localStorage.setItem(
-                    'matrix_permission_error',
+                    'painel_permission_error',
                     'Você não possui permissão para acessar esta página.'
                 )
 
@@ -57,7 +56,9 @@ export function RouteGuard({ allowedRoles, children }: RouteGuardProps) {
         void checkPermission()
     }, [allowedRoles, router])
 
-    {
-        return <>{children}</>
+    if (checking || !authorized) {
+        return null
     }
+
+    return <>{children}</>
 }

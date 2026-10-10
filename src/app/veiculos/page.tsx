@@ -7,6 +7,7 @@ import { CurrencyInput } from '../components/currency-input'
 import { Toast } from '../components/ui/toast'
 import { ConfirmDialog } from '../components/ui/confirm-dialog'
 import { supabase } from '../../lib/supabase'
+import { openVehicleDocument, tenantFilePath } from '../../lib/tenant'
 import { Eye, FileText, ImageIcon, Pencil, Star, Trash2, Upload, X } from 'lucide-react'
 
 type Brand = {
@@ -90,7 +91,7 @@ function parseCurrency(value: string) {
 }
 
 function createVehicleFilePath(vehicleId: string, fileName: string) {
-    return `${vehicleId}/${Date.now()}-${fileName}`
+    return tenantFilePath(`${vehicleId}/${Date.now()}-${fileName}`)
 }
 
 function formatChassi(value: string) {
@@ -478,7 +479,7 @@ export default function VeiculosPage() {
             .replace(/\s/g, '-')
             .replace(/[^a-z0-9.-]/g, '')
 
-        const filePath = createVehicleFilePath(vehicleId, safeFileName)
+        const filePath = await createVehicleFilePath(vehicleId, safeFileName)
 
         const { error: uploadError } = await supabase.storage
             .from(bucket)
@@ -915,14 +916,14 @@ export default function VeiculosPage() {
         <>
             <PageContainer
                 title="Veículos"
-                description="Controle de veículos da Matrix."
+                description="Controle de veículos da loja."
                 action={
                     <button
                         onClick={() => {
                             setShowForm(!showForm)
                             resetForm()
                         }}
-                        className="rounded-2xl bg-red-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-red-600/20 transition-all duration-300 hover:-translate-y-0.5 hover:bg-red-700"
+                        className="rounded-2xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-brand-600/20 transition-all duration-300 hover:-translate-y-0.5 hover:bg-brand-700"
                     >
                         {showForm ? 'Fechar formulário' : '+ Novo veículo'}
                     </button>
@@ -971,7 +972,7 @@ export default function VeiculosPage() {
                                         }
                                         placeholder="ABC1D23"
                                         maxLength={7}
-                                        className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                                        className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10"
                                     />
                                 </div>
 
@@ -980,7 +981,7 @@ export default function VeiculosPage() {
                                     <select
                                         value={brandId}
                                         onChange={(event) => handleBrandChange(event.target.value)}
-                                        className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                                        className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10"
                                     >
                                         <option value="">Selecione</option>
                                         {brands.map((brand) => (
@@ -997,7 +998,7 @@ export default function VeiculosPage() {
                                         value={modelId}
                                         onChange={(event) => setModelId(event.target.value)}
                                         disabled={!brandId}
-                                        className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10 disabled:bg-zinc-100 disabled:text-zinc-400"
+                                        className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 disabled:bg-zinc-100 disabled:text-zinc-400"
                                     >
                                         <option value="">
                                             {brandId ? 'Selecione' : 'Selecione uma marca primeiro'}
@@ -1016,7 +1017,7 @@ export default function VeiculosPage() {
                                     <select
                                         value={categoryId}
                                         onChange={(event) => setCategoryId(event.target.value)}
-                                        className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                                        className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10"
                                     >
                                         <option value="">Selecione</option>
                                         {categories.map((category) => (
@@ -1032,7 +1033,7 @@ export default function VeiculosPage() {
                                     <select
                                         value={colorId}
                                         onChange={(event) => setColorId(event.target.value)}
-                                        className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                                        className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10"
                                     >
                                         <option value="">Selecione</option>
                                         {colors.map((item) => (
@@ -1048,7 +1049,7 @@ export default function VeiculosPage() {
                                     <select
                                         value={engineId}
                                         onChange={(event) => setEngineId(event.target.value)}
-                                        className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                                        className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10"
                                     >
                                         <option value="">Selecione</option>
                                         {engines.map((item) => (
@@ -1064,7 +1065,7 @@ export default function VeiculosPage() {
                                     <select
                                         value={transmissionId}
                                         onChange={(event) => setTransmissionId(event.target.value)}
-                                        className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                                        className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10"
                                     >
                                         <option value="">Selecione</option>
                                         {transmissions.map((item) => (
@@ -1082,7 +1083,7 @@ export default function VeiculosPage() {
                                     <select
                                         value={fuelId}
                                         onChange={(event) => setFuelId(event.target.value)}
-                                        className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                                        className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10"
                                     >
                                         <option value="">Selecione</option>
                                         {fuels.map((item) => (
@@ -1102,7 +1103,7 @@ export default function VeiculosPage() {
                                         value={manufactureYear}
                                         onChange={(event) => setManufactureYear(event.target.value)}
                                         placeholder="2020"
-                                        className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                                        className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10"
                                     />
                                 </div>
 
@@ -1115,7 +1116,7 @@ export default function VeiculosPage() {
                                         value={modelYear}
                                         onChange={(event) => setModelYear(event.target.value)}
                                         placeholder="2021"
-                                        className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                                        className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10"
                                     />
                                 </div>
 
@@ -1126,7 +1127,7 @@ export default function VeiculosPage() {
                                         value={km}
                                         onChange={(event) => setKm(event.target.value)}
                                         placeholder="45000"
-                                        className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                                        className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10"
                                     />
                                 </div>
 
@@ -1137,7 +1138,7 @@ export default function VeiculosPage() {
                                         onChange={(event) => setChassi(formatChassi(event.target.value))}
                                         placeholder="9BWZZZ377VT004251"
                                         maxLength={17}
-                                        className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 uppercase outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                                        className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 uppercase outline-none transition-all focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10"
                                     />
                                     <p className="mt-1 text-xs text-zinc-400">
                                         {chassi.length}/17 caracteres
@@ -1152,7 +1153,7 @@ export default function VeiculosPage() {
                                         placeholder="12345678901"
                                         maxLength={11}
                                         inputMode="numeric"
-                                        className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                                        className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10"
                                     />
                                     <p className="mt-1 text-xs text-zinc-400">
                                         {renavam.length}/11 dígitos
@@ -1189,7 +1190,7 @@ export default function VeiculosPage() {
                                                 setIsPublished(false)
                                             }
                                         }}
-                                        className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                                        className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10"
                                     >
                                         {statusOptions.map((item) => (
                                             <option key={item.value} value={item.value}>
@@ -1229,7 +1230,7 @@ export default function VeiculosPage() {
                                         onChange={(event) => setNotes(event.target.value)}
                                         placeholder="Ex: veículo revisado, manual e chave reserva, IPVA pago..."
                                         rows={4}
-                                        className="mt-2 w-full resize-none rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                                        className="mt-2 w-full resize-none rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10"
                                     />
                                 </div>
                             </div>
@@ -1247,7 +1248,7 @@ export default function VeiculosPage() {
                                 </div>
 
                                 <div className="mt-5 flex flex-wrap gap-3">
-                                    <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-red-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-red-700">
+                                    <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-brand-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-brand-700">
                                         <Upload size={18} />
                                         Enviar fotos
                                         <input
@@ -1338,7 +1339,7 @@ export default function VeiculosPage() {
                                                 <div
                                                     key={file.id}
                                                     className={`overflow-hidden rounded-2xl border bg-white ${isMainPhoto
-                                                        ? 'border-red-300 ring-2 ring-red-100'
+                                                        ? 'border-brand-300 ring-2 ring-brand-100'
                                                         : 'border-zinc-200'
                                                         }`}
                                                 >
@@ -1367,7 +1368,7 @@ export default function VeiculosPage() {
                                                             </div>
 
                                                             {isMainPhoto && (
-                                                                <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-red-50 px-2 py-1 text-[10px] font-bold text-red-600">
+                                                                <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-brand-50 px-2 py-1 text-[10px] font-bold text-brand-600">
                                                                     <Star size={12} fill="currentColor" />
                                                                     Principal
                                                                 </span>
@@ -1476,14 +1477,17 @@ export default function VeiculosPage() {
                                                 </div>
 
                                                 <div className="flex shrink-0 gap-2">
-                                                    <a
-                                                        href={getPublicFileUrl(file)}
-                                                        target="_blank"
-                                                        rel="noreferrer"
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            openVehicleDocument(file.file_path).catch(() =>
+                                                                showToast('error', 'Erro', 'Não foi possível abrir o documento.')
+                                                            )
+                                                        }
                                                         className="rounded-xl bg-zinc-100 px-3 py-2 text-xs font-bold text-zinc-700 transition hover:bg-zinc-200"
                                                     >
                                                         Abrir
-                                                    </a>
+                                                    </button>
 
                                                     <button
                                                         onClick={() => setDeleteFile(file)}
@@ -1553,7 +1557,7 @@ export default function VeiculosPage() {
                             value={search}
                             onChange={(event) => setSearch(event.target.value)}
                             placeholder="Buscar por placa, marca, modelo, cor, chassi ou renavam..."
-                            className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                            className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10"
                         />
                     </div>
 
@@ -1563,7 +1567,7 @@ export default function VeiculosPage() {
                         <select
                             value={statusFilter}
                             onChange={(event) => setStatusFilter(event.target.value)}
-                            className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                            className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10"
                         >
                             <option value="">Todos</option>
 
@@ -1583,7 +1587,7 @@ export default function VeiculosPage() {
                         <select
                             value={publishedFilter}
                             onChange={(event) => setPublishedFilter(event.target.value)}
-                            className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                            className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10"
                         >
                             <option value="">Todos</option>
                             <option value="PUBLICADO">Publicados</option>

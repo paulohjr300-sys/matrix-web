@@ -6,6 +6,7 @@ import { PageContainer } from '../../components/page-container'
 import { Toast } from '../../components/ui/toast'
 import { ConfirmDialog } from '../../components/ui/confirm-dialog'
 import { supabase } from '../../../lib/supabase'
+import { tenantFilePath } from '../../../lib/tenant'
 
 type VehicleCategory = {
     id: string
@@ -31,7 +32,7 @@ function createFilePath(file: File) {
         .replace(/\s/g, '-')
         .replace(/[^a-z0-9.-]/g, '')
 
-    return `${Date.now()}-${safeName}`
+    return tenantFilePath(`${Date.now()}-${safeName}`)
 }
 
 async function compressImage(file: File): Promise<File> {
@@ -185,7 +186,7 @@ export default function CategoriasHomePage() {
 
     async function uploadImage(file: File) {
         const compressedFile = await compressImage(file)
-        const filePath = createFilePath(compressedFile)
+        const filePath = await createFilePath(compressedFile)
 
         const { error } = await supabase.storage
             .from('site-category-blocks')
@@ -329,7 +330,7 @@ export default function CategoriasHomePage() {
                             setShowForm(!showForm)
                             resetForm()
                         }}
-                        className="rounded-2xl bg-red-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-red-600/20 transition-all hover:-translate-y-0.5 hover:bg-red-700"
+                        className="rounded-2xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-brand-600/20 transition-all hover:-translate-y-0.5 hover:bg-brand-700"
                     >
                         {showForm ? 'Fechar formulário' : '+ Nova categoria'}
                     </button>
@@ -361,7 +362,7 @@ export default function CategoriasHomePage() {
                                             setTitle(selectedCategory.name)
                                         }
                                     }}
-                                    className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                                    className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10"
                                 >
                                     <option value="">Selecione</option>
 
@@ -382,7 +383,7 @@ export default function CategoriasHomePage() {
                                     value={title}
                                     onChange={(event) => setTitle(event.target.value)}
                                     placeholder="Ex: SUVs"
-                                    className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                                    className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10"
                                 />
                             </div>
 
@@ -396,7 +397,7 @@ export default function CategoriasHomePage() {
                                     value={sortOrder}
                                     onChange={(event) => setSortOrder(event.target.value)}
                                     placeholder="0"
-                                    className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                                    className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10"
                                 />
                             </div>
 
@@ -506,7 +507,7 @@ export default function CategoriasHomePage() {
                                             Categoria vinculada: {block.vehicle_categories?.name || '-'}
                                         </p>
 
-                                        <p className="mt-3 text-sm font-semibold text-red-600">
+                                        <p className="mt-3 text-sm font-semibold text-brand-600">
                                             Link no site: /estoque?categoria=
                                             {encodeURIComponent(block.vehicle_categories?.name || '')}
                                         </p>

@@ -1,7 +1,15 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { requireRole } from "../../../../lib/auth-server";
+import { supabaseAdmin } from "../../../../lib/supabase-admin";
 
 export async function POST(request: Request) {
+  const auth = await requireRole(["ADMIN"]);
+
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   try {
     const { email } = await request.json();
 
@@ -20,6 +28,20 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { message: "Variáveis de ambiente não configuradas." },
         { status: 500 },
+      );
+    }
+
+    const { data: target } = await supabaseAdmin
+      .from("profiles")
+      .select("id")
+      .eq("email", email)
+      .eq("empresa_id", auth.empresaId)
+      .maybeSingle();
+
+    if (!target) {
+      return NextResponse.json(
+        { message: "Usuário não encontrado." },
+        { status: 404 },
       );
     }
 

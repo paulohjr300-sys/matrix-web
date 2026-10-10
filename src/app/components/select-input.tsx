@@ -20,7 +20,7 @@ export function SelectInput({
             <select
                 value={value}
                 onChange={(event) => onChange?.(event.target.value)}
-                className="mt-2 w-full rounded-xl border border-zinc-200 bg-white px-4 py-3 outline-none transition-all duration-200 focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                className="mt-2 w-full rounded-xl border border-zinc-200 bg-white px-4 py-3 outline-none transition-all duration-200 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10"
             >
                 <option value="">Selecione</option>
 

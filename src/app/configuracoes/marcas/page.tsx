@@ -152,7 +152,7 @@ export default function MarcasPage() {
                                 setEditingBrandId(null)
                                 setBrandName('')
                             }}
-                            className="rounded-2xl bg-red-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-red-600/20 transition-all duration-300 hover:-translate-y-0.5 hover:bg-red-700"
+                            className="rounded-2xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-brand-600/20 transition-all duration-300 hover:-translate-y-0.5 hover:bg-brand-700"
                         >
                             {showForm ? 'Fechar' : '+ Nova marca'}
                         </button>
@@ -160,7 +160,7 @@ export default function MarcasPage() {
                 >
                     <Link
                         href="/configuracoes"
-                        className="mb-6 inline-flex items-center gap-2 text-sm font-semibold text-zinc-500 transition hover:text-red-600"
+                        className="mb-6 inline-flex items-center gap-2 text-sm font-semibold text-zinc-500 transition hover:text-brand-600"
                     >
                         <ArrowLeft size={18} />
                         Voltar para configurações
@@ -177,7 +177,7 @@ export default function MarcasPage() {
                                     value={brandName}
                                     onChange={(event) => setBrandName(event.target.value)}
                                     placeholder="Ex: Honda"
-                                    className="w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                                    className="w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10"
                                 />
 
                                 <button

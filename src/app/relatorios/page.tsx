@@ -315,7 +315,7 @@ export default function RelatoriosPage() {
                                     </p>
                                 </div>
 
-                                <div className="rounded-2xl bg-red-50 p-3 text-red-600">
+                                <div className="rounded-2xl bg-brand-50 p-3 text-brand-600">
                                     <BarChart3 size={22} />
                                 </div>
                             </div>
@@ -567,7 +567,7 @@ function SummaryCard({
                 </div>
 
                 <div
-                    className={`rounded-2xl p-3 ${dark ? 'bg-white/10 text-white' : 'bg-red-50 text-red-600'
+                    className={`rounded-2xl p-3 ${dark ? 'bg-white/10 text-white' : 'bg-brand-50 text-brand-600'
                         }`}
                 >
                     {icon}

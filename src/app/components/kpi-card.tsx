@@ -24,7 +24,7 @@ export function KpiCard({
                     </h2>
                 </div>
 
-                <div className="bg-red-50 p-3 rounded-xl">
+                <div className="bg-brand-50 p-3 rounded-xl">
                     {icon}
                 </div>
             </div>

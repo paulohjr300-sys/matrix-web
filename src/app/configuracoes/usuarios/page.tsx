@@ -235,7 +235,7 @@ export default function UsuariosPage() {
                             setShowForm(!showForm)
                             resetForm()
                         }}
-                        className="inline-flex items-center gap-2 rounded-2xl bg-red-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-red-600/20 transition-all hover:-translate-y-0.5 hover:bg-red-700"
+                        className="inline-flex items-center gap-2 rounded-2xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-brand-600/20 transition-all hover:-translate-y-0.5 hover:bg-brand-700"
                     >
                         <UserPlus size={18} />
                         {showForm ? 'Fechar' : '+ Novo usuário'}
@@ -255,7 +255,7 @@ export default function UsuariosPage() {
                                     value={name}
                                     onChange={(event) => setName(event.target.value)}
                                     placeholder="Ex: João Silva"
-                                    className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                                    className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10"
                                 />
                             </div>
 
@@ -267,8 +267,8 @@ export default function UsuariosPage() {
                                     type="email"
                                     value={email}
                                     onChange={(event) => setEmail(event.target.value)}
-                                    placeholder="joao@matrix.com"
-                                    className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                                    placeholder="joao@sualoja.com.br"
+                                    className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10"
                                 />
                             </div>
 
@@ -281,7 +281,7 @@ export default function UsuariosPage() {
                                     value={password}
                                     onChange={(event) => setPassword(event.target.value)}
                                     placeholder="Mínimo 6 caracteres"
-                                    className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                                    className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10"
                                 />
                             </div>
 
@@ -294,7 +294,7 @@ export default function UsuariosPage() {
                                     onChange={(event) =>
                                         setRole(event.target.value as Profile['role'])
                                     }
-                                    className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                                    className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10"
                                 >
                                     <option value="VENDEDOR">Vendedor</option>
                                     <option value="GERENTE">Gerente</option>
@@ -336,7 +336,7 @@ export default function UsuariosPage() {
                                     <td className="px-5 py-4">{user.email}</td>
 
                                     <td className="px-5 py-4">
-                                        <span className="rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-600">
+                                        <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-bold text-brand-600">
                                             {user.role}
                                         </span>
 

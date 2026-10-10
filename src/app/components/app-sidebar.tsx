@@ -15,6 +15,7 @@ import {
   UserRound,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import { PainelLogo } from './brand/painel-logo'
 
 type Role = 'ADMIN' | 'GERENTE' | 'VENDEDOR'
 
@@ -74,7 +75,7 @@ export function AppSidebar() {
   const router = useRouter()
   const [role, setRole] = useState<Role | null>(() => {
     if (typeof window === 'undefined') return null
-    return localStorage.getItem('matrix_role') as Role | null
+    return localStorage.getItem('painel_role') as Role | null
   })
 
   useEffect(() => {
@@ -95,8 +96,8 @@ export function AppSidebar() {
 
       if (data?.role) {
         setRole(data.role)
-        localStorage.setItem('matrix_role', data.role)
-        localStorage.setItem('matrix_name', data.name)
+        localStorage.setItem('painel_role', data.role)
+        localStorage.setItem('painel_name', data.name)
       }
     }
 
@@ -104,7 +105,7 @@ export function AppSidebar() {
   }, [])
 
   async function handleLogout() {
-    localStorage.removeItem('matrix_role')
+    localStorage.removeItem('painel_role')
     await supabase.auth.signOut()
     router.push('/login')
   }
@@ -114,13 +115,15 @@ export function AppSidebar() {
   )
 
   return (
-    <aside className="hidden min-h-screen w-64 bg-zinc-950 p-6 text-white md:block">
+    <aside className="hidden min-h-screen w-64 bg-brand-900 p-6 text-white md:block">
       <div className="mb-10">
-        <h1 className="text-3xl font-black tracking-widest">MATRIX</h1>
-        <p className="mt-1 text-xs text-zinc-400">Gestão de Veículos</p>
+        <h1>
+          <PainelLogo variant="dark" />
+        </h1>
+        <p className="mt-2 text-xs text-brand-300">Gestão de Veículos</p>
 
         {role && (
-          <span className="mt-4 inline-block rounded-full bg-red-600 px-3 py-1 text-xs font-bold">
+          <span className="mt-4 inline-block rounded-full bg-brand-600 px-3 py-1 text-xs font-bold">
             {role}
           </span>
         )}
@@ -137,7 +140,7 @@ export function AppSidebar() {
               key={menu.href}
               href={menu.href}
               className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition ${active
-                  ? 'bg-red-600 text-white'
+                  ? 'bg-brand-600 text-white'
                   : 'text-zinc-300 hover:bg-zinc-800 hover:text-white'
                 }`}
             >

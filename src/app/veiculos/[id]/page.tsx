@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { PageContainer } from '../../components/page-container'
 import { supabase } from '../../../lib/supabase'
+import { openVehicleDocument } from '../../../lib/tenant'
 import { Toast } from '../../components/ui/toast'
 
 
@@ -206,7 +207,7 @@ export default function VeiculoDetalhesPage() {
             <PageContainer title="Veículo" description="Não encontrado">
                 <Link
                     href="/veiculos"
-                    className="mb-6 inline-flex items-center gap-2 text-sm font-semibold text-zinc-500 transition hover:text-red-600"
+                    className="mb-6 inline-flex items-center gap-2 text-sm font-semibold text-zinc-500 transition hover:text-brand-600"
                 >
                     <ArrowLeft size={18} />
                     Voltar para veículos
@@ -248,7 +249,7 @@ export default function VeiculoDetalhesPage() {
             >
                 <Link
                     href="/veiculos"
-                    className="mb-6 inline-flex items-center gap-2 text-sm font-semibold text-zinc-500 transition hover:text-red-600"
+                    className="mb-6 inline-flex items-center gap-2 text-sm font-semibold text-zinc-500 transition hover:text-brand-600"
                 >
                     <ArrowLeft size={18} />
                     Voltar para veículos
@@ -269,7 +270,7 @@ export default function VeiculoDetalhesPage() {
                     </div>
 
                     <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-xl shadow-zinc-200/50">
-                        <DollarSign className="text-red-600" />
+                        <DollarSign className="text-brand-600" />
                         <p className="mt-4 text-sm text-zinc-500">Investimento</p>
                         <strong className="mt-2 block text-2xl">
                             {formatCurrency(investment)}
@@ -402,9 +403,13 @@ export default function VeiculoDetalhesPage() {
                             {documents.map((file) => (
                                 <a
                                     key={file.id}
-                                    href={getPublicFileUrl(file)}
-                                    target="_blank"
-                                    rel="noreferrer"
+                                    href="#"
+                                    onClick={(event) => {
+                                        event.preventDefault()
+                                        openVehicleDocument(file.file_path).catch(() =>
+                                            showToast('error', 'Erro', 'Não foi possível abrir o documento.')
+                                        )
+                                    }}
                                     className="flex items-center justify-between gap-4 rounded-2xl border border-zinc-200 p-4 transition hover:bg-zinc-50"
                                 >
                                     <div className="min-w-0">

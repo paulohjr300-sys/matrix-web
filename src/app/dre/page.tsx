@@ -262,7 +262,7 @@ function DreContent() {
                                     </h2>
                                 </div>
 
-                                <div className="rounded-2xl bg-red-50 p-3 text-red-600">
+                                <div className="rounded-2xl bg-brand-50 p-3 text-brand-600">
                                     <Car size={22} />
                                 </div>
                             </div>
@@ -333,7 +333,7 @@ function DreContent() {
                                 value={search}
                                 onChange={(event) => setSearch(event.target.value)}
                                 placeholder="Buscar por placa, marca ou modelo..."
-                                className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                                className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10"
                             />
                         </div>
 
@@ -345,7 +345,7 @@ function DreContent() {
                             <select
                                 value={statusFilter}
                                 onChange={(event) => setStatusFilter(event.target.value)}
-                                className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                                className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10"
                             >
                                 <option value="">Todos</option>
 

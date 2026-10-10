@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabase'
+import { PainelLogo } from '../components/brand/painel-logo'
 
 export default function LoginPage() {
     const router = useRouter()
@@ -61,7 +62,7 @@ export default function LoginPage() {
             return
         }
 
-        localStorage.setItem('matrix_role', profile.role)
+        localStorage.setItem('painel_role', profile.role)
 
         if (profile.must_change_password) {
             router.push('/alterar-senha')
@@ -95,11 +96,11 @@ export default function LoginPage() {
     }
 
     return (
-        <main className="flex min-h-screen items-center justify-center bg-zinc-950 p-6">
-            <div className="w-full max-w-md rounded-3xl border border-zinc-800 bg-white p-8 shadow-2xl">
+        <main className="flex min-h-screen items-center justify-center bg-brand-900 p-6">
+            <div className="w-full max-w-md rounded-3xl border border-brand-800 bg-white p-8 shadow-2xl">
                 <div className="mb-8 text-center">
-                    <h1 className="text-4xl font-black tracking-widest text-zinc-950">
-                        MATRIX
+                    <h1 className="flex justify-center">
+                        <PainelLogo size="lg" />
                     </h1>
                     <p className="mt-2 text-sm text-zinc-500">
                         Acesse sua conta para continuar.
@@ -131,7 +132,7 @@ export default function LoginPage() {
                             value={email}
                             onChange={(event) => setEmail(event.target.value)}
                             placeholder="usuario@email.com"
-                            className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                            className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10"
                         />
                     </div>
 
@@ -142,14 +143,14 @@ export default function LoginPage() {
                             value={password}
                             onChange={(event) => setPassword(event.target.value)}
                             placeholder="Sua senha"
-                            className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                            className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10"
                         />
                     </div>
 
                     <button
                         type="submit"
                         disabled={loading}
-                        className="w-full rounded-xl bg-red-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-50"
+                        className="w-full rounded-xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
                     >
                         {loading ? 'Entrando...' : 'Entrar'}
                     </button>
@@ -157,7 +158,7 @@ export default function LoginPage() {
                     <button
                         type="button"
                         onClick={handleForgotPassword}
-                        className="w-full text-sm font-semibold text-red-600 hover:text-red-700"
+                        className="w-full text-sm font-semibold text-brand-600 hover:text-brand-700"
                     >
                         Esqueci minha senha
                     </button>

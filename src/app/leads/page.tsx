@@ -101,7 +101,7 @@ function getLeadCardClass(status: LeadStatus) {
         case 'FECHADO':
             return 'border-emerald-300 bg-emerald-50/30 shadow-emerald-100/60'
         case 'PERDIDO':
-            return 'border-red-300 bg-red-50/30 shadow-red-100/60'
+            return 'border-brand-300 bg-brand-50/30 shadow-brand-100/60'
         default:
             return 'border-zinc-200 bg-white shadow-zinc-200/50'
     }
@@ -513,7 +513,7 @@ export default function LeadsPage() {
         <>
             <PageContainer
                 title="Leads"
-                description="Gerencie os contatos recebidos pelo site público da Matrix."
+                description="Gerencie os contatos recebidos pelo site da loja."
             >
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
                     <SummaryCard title="Total de leads" value={String(totals.total)} />
@@ -581,7 +581,7 @@ export default function LeadsPage() {
 
                     {filteredLeads.map((lead) => {
                         const phone = onlyNumbers(lead.telefone)
-                        const whatsappMessage = `Olá, ${lead.nome || ''}! Recebemos seu contato pelo site da Matrix sobre o veículo ${getVehicleName(
+                        const whatsappMessage = `Olá, ${lead.nome || ''}! Recebemos seu contato pelo nosso site sobre o veículo ${getVehicleName(
                             lead,
                             false
                         )}.`
@@ -606,7 +606,7 @@ export default function LeadsPage() {
                                 <div className="grid grid-cols-1 gap-6 pl-2 xl:grid-cols-[1.2fr_1fr_1.2fr_auto]">
                                     <div>
                                         <div className="flex items-start gap-4">
-                                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-red-50 text-red-600">
+                                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand-50 text-brand-600">
                                                 <UserRound size={22} />
                                             </div>
 
@@ -728,7 +728,7 @@ export default function LeadsPage() {
                                                 {lead.status !== 'PERDIDO' && (
                                                     <button
                                                         onClick={() => void handleUpdateStatus(lead.id, 'PERDIDO')}
-                                                        className="h-10 rounded-xl bg-red-50 px-3 text-xs font-bold text-red-700 transition hover:bg-red-100"
+                                                        className="h-10 rounded-xl bg-brand-50 px-3 text-xs font-bold text-brand-700 transition hover:bg-brand-100"
                                                     >
                                                         Perdido
                                                     </button>
@@ -838,7 +838,7 @@ export default function LeadsPage() {
                                             )
                                         }
                                     }}
-                                    className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                                    className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10"
                                 >
                                     <option value="">Selecione o veículo</option>
 
@@ -859,7 +859,7 @@ export default function LeadsPage() {
                                     type="date"
                                     value={saleDate}
                                     onChange={(event) => setSaleDate(event.target.value)}
-                                    className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                                    className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10"
                                 />
                             </div>
 
@@ -879,7 +879,7 @@ export default function LeadsPage() {
                                 <select
                                     value={salePaymentMethod}
                                     onChange={(event) => setSalePaymentMethod(event.target.value)}
-                                    className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                                    className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10"
                                 >
                                     {paymentMethods.map((item) => (
                                         <option key={item} value={item}>

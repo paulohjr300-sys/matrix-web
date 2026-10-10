@@ -127,7 +127,7 @@ export default function DashboardPage() {
       }
     }
 
-    const error = localStorage.getItem('matrix_permission_error')
+    const error = localStorage.getItem('painel_permission_error')
 
     if (!error) {
       return {
@@ -138,7 +138,7 @@ export default function DashboardPage() {
       }
     }
 
-    localStorage.removeItem('matrix_permission_error')
+    localStorage.removeItem('painel_permission_error')
 
     return {
       open: true,
@@ -265,7 +265,7 @@ export default function DashboardPage() {
   return (
     <PageContainer
       title="Dashboard"
-      description="Visão geral da concessionária Matrix."
+      description="Visão geral da loja."
     >
       <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
         <KpiCard
@@ -295,18 +295,18 @@ export default function DashboardPage() {
         <KpiCard
           title="Lucro Total"
           value={formatCurrency(totals.profit)}
-          icon={<DollarSign className="text-red-600" />}
+          icon={<DollarSign className="text-brand-600" />}
         />
       </div>
 
       <div className="mt-8 rounded-3xl border border-zinc-200 bg-zinc-950 p-6 text-white shadow-xl shadow-zinc-300/60">
         <div className="flex items-center gap-3">
-          <div className="rounded-2xl bg-red-600 p-3">
+          <div className="rounded-2xl bg-brand-600 p-3">
             <Lightbulb size={22} />
           </div>
 
           <div>
-            <h2 className="text-xl font-bold">Insights da Matrix</h2>
+            <h2 className="text-xl font-bold">Insights da loja</h2>
             <p className="text-sm text-zinc-400">
               Alertas automáticos para ajudar na tomada de decisão.
             </p>
@@ -426,7 +426,7 @@ export default function DashboardPage() {
                 className="flex items-center justify-between rounded-2xl border border-zinc-200 p-4"
               >
                 <div>
-                  <span className="text-sm font-bold text-red-600">
+                  <span className="text-sm font-bold text-brand-600">
                     #{index + 1}
                   </span>
 
@@ -558,7 +558,7 @@ export default function DashboardPage() {
                 <td className="px-5 py-4 text-right">
                   <Link
                     href={`/dre?vehicleId=${vehicle.id}`}
-                    className="text-sm font-semibold text-red-600 hover:text-red-700"
+                    className="text-sm font-semibold text-brand-600 hover:text-brand-700"
                   >
                     Ver DRE
                   </Link>

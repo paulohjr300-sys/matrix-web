@@ -7,6 +7,7 @@ import { PageContainer } from '../../components/page-container'
 import { Toast } from '../../components/ui/toast'
 import { ConfirmDialog } from '../../components/ui/confirm-dialog'
 import { supabase } from '../../../lib/supabase'
+import { tenantFilePath } from '../../../lib/tenant'
 
 type Banner = {
     id: string
@@ -31,7 +32,7 @@ function createFilePath(file: File) {
         .replace(/\s/g, '-')
         .replace(/[^a-z0-9.-]/g, '')
 
-    return `${Date.now()}-${safeName}`
+    return tenantFilePath(`${Date.now()}-${safeName}`)
 }
 
 function clampOverlayValue(value: string) {
@@ -214,7 +215,7 @@ export default function BannersPage() {
 
     async function uploadImage(file: File) {
         const compressedFile = await compressImage(file)
-        const filePath = createFilePath(compressedFile)
+        const filePath = await createFilePath(compressedFile)
 
         const { error } = await supabase.storage
             .from('site-banners')
@@ -360,7 +361,7 @@ export default function BannersPage() {
                             setShowForm(!showForm)
                             resetForm()
                         }}
-                        className="rounded-2xl bg-red-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-red-600/20 transition-all hover:-translate-y-0.5 hover:bg-red-700"
+                        className="rounded-2xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-brand-600/20 transition-all hover:-translate-y-0.5 hover:bg-brand-700"
                     >
                         {showForm ? 'Fechar formulário' : '+ Novo banner'}
                     </button>
@@ -381,7 +382,7 @@ export default function BannersPage() {
                                     value={title}
                                     onChange={(event) => setTitle(event.target.value)}
                                     placeholder="Ex: Encontre seu próximo carro"
-                                    className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                                    className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10"
                                 />
                             </div>
 
@@ -393,7 +394,7 @@ export default function BannersPage() {
                                     value={subtitle}
                                     onChange={(event) => setSubtitle(event.target.value)}
                                     placeholder="Ex: Veículos selecionados para você"
-                                    className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                                    className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10"
                                 />
                             </div>
 
@@ -405,7 +406,7 @@ export default function BannersPage() {
                                     value={buttonText}
                                     onChange={(event) => setButtonText(event.target.value)}
                                     placeholder="Ex: Ver estoque"
-                                    className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                                    className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10"
                                 />
                             </div>
 
@@ -417,7 +418,7 @@ export default function BannersPage() {
                                     value={buttonLink}
                                     onChange={(event) => setButtonLink(event.target.value)}
                                     placeholder="Ex: /estoque"
-                                    className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                                    className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10"
                                 />
                             </div>
 
@@ -430,7 +431,7 @@ export default function BannersPage() {
                                     value={sortOrder}
                                     onChange={(event) => setSortOrder(event.target.value)}
                                     placeholder="0"
-                                    className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                                    className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10"
                                 />
                             </div>
 
@@ -644,7 +645,7 @@ export default function BannersPage() {
                                         </p>
 
                                         {(banner.button_text || banner.button_link) && (
-                                            <p className="mt-3 text-sm font-semibold text-red-600">
+                                            <p className="mt-3 text-sm font-semibold text-brand-600">
                                                 {banner.button_text || 'Botão'} → {banner.button_link || '-'}
                                             </p>
                                         )}
@@ -833,7 +834,7 @@ function BannerPreview({
                                 </p>
 
                                 {buttonText && (
-                                    <span className="mt-5 inline-flex h-11 items-center rounded-xl bg-red-600 px-5 text-xs font-black uppercase tracking-wide text-white">
+                                    <span className="mt-5 inline-flex h-11 items-center rounded-xl bg-brand-600 px-5 text-xs font-black uppercase tracking-wide text-white">
                                         {buttonText}
                                     </span>
                                 )}
@@ -875,7 +876,7 @@ function BannerPreview({
                                 </p>
 
                                 {buttonText && (
-                                    <span className="mt-5 inline-flex h-11 items-center rounded-xl bg-red-600 px-5 text-xs font-black uppercase tracking-wide text-white">
+                                    <span className="mt-5 inline-flex h-11 items-center rounded-xl bg-brand-600 px-5 text-xs font-black uppercase tracking-wide text-white">
                                         {buttonText}
                                     </span>
                                 )}

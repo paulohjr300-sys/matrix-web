@@ -30,8 +30,8 @@ export function AppHeader({ title, description }: AppHeaderProps) {
             }
         }
 
-        const name = window.localStorage.getItem('matrix_name') || 'Usuário'
-        const role = window.localStorage.getItem('matrix_role') || ''
+        const name = window.localStorage.getItem('painel_name') || 'Usuário'
+        const role = window.localStorage.getItem('painel_role') || ''
 
         return { name, role }
     })
@@ -209,7 +209,7 @@ export function AppHeader({ title, description }: AppHeaderProps) {
                             type="button"
                             onClick={() => setDropdownOpen((current) => !current)}
                             className={`relative rounded-2xl border p-3 shadow-sm transition-all duration-300 hover:-translate-y-0.5 ${bellAttention
-                                    ? 'border-red-200 bg-red-50 text-red-600 ring-4 ring-red-500/20'
+                                    ? 'border-brand-200 bg-brand-50 text-brand-600 ring-4 ring-brand-500/20'
                                     : 'border-zinc-200 bg-white hover:bg-zinc-50'
                                 }`} 
                         >
@@ -245,7 +245,7 @@ export function AppHeader({ title, description }: AppHeaderProps) {
                                             onClick={() => setDropdownOpen(false)}
                                             className="flex gap-3 rounded-2xl p-4 transition hover:bg-zinc-50"
                                         >
-                                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600">
+                                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
                                                 {getNotificationIcon(item.icon)}
                                             </div>
 
@@ -258,7 +258,7 @@ export function AppHeader({ title, description }: AppHeaderProps) {
                                                     {item.description}
                                                 </p>
 
-                                                <p className="mt-2 text-xs font-bold text-red-600">
+                                                <p className="mt-2 text-xs font-bold text-brand-600">
                                                     Corrigir agora
                                                 </p>
                                             </div>

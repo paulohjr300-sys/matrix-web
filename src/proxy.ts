@@ -3,9 +3,13 @@ import { createServerClient } from "@supabase/ssr";
 
 const publicRoutes = ["/login", "/reset-password"];
 
+// Rotas liberadas para qualquer usuário autenticado e ativo.
+const sharedRoutes = ["/alterar-senha"];
+
 const roleAccess = {
   ADMIN: [
     "/dashboard",
+    "/leads",
     "/veiculos",
     "/vendas",
     "/custos",
@@ -15,22 +19,33 @@ const roleAccess = {
   ],
   GERENTE: [
     "/dashboard",
+    "/leads",
     "/veiculos",
     "/vendas",
     "/custos",
     "/dre",
     "/relatorios",
   ],
-  VENDEDOR: ["/dashboard", "/veiculos", "/vendas"],
+  VENDEDOR: ["/dashboard", "/leads", "/veiculos", "/vendas"],
 };
 
-function canAccess(pathname: string, role: string) {
-  const allowedRoutes = roleAccess[role as keyof typeof roleAccess] || [];
-
-  return allowedRoutes.some((route) => pathname.startsWith(route));
+function matchesRoute(pathname: string, route: string) {
+  return pathname === route || pathname.startsWith(`${route}/`);
 }
 
-export async function middleware(request: NextRequest) {
+function canAccess(pathname: string, role: string) {
+  if (pathname === "/") return true;
+
+  if (sharedRoutes.some((route) => matchesRoute(pathname, route))) {
+    return true;
+  }
+
+  const allowedRoutes = roleAccess[role as keyof typeof roleAccess] || [];
+
+  return allowedRoutes.some((route) => matchesRoute(pathname, route));
+}
+
+export async function proxy(request: NextRequest) {
   let response = NextResponse.next({
     request,
   });
@@ -66,8 +81,14 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  // As rotas de API fazem a própria checagem de sessão e perfil e
+  // respondem em JSON, então aqui só renovamos a sessão.
+  if (pathname.startsWith("/api/")) {
+    return response;
+  }
+
   const isPublicRoute = publicRoutes.some((route) =>
-    pathname.startsWith(route),
+    matchesRoute(pathname, route),
   );
 
   if (!user && !isPublicRoute) {
@@ -81,12 +102,20 @@ export async function middleware(request: NextRequest) {
   if (user && !isPublicRoute) {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("role")
+      .select("role, is_active")
       .eq("id", user.id)
       .single();
 
-    if (!profile?.role) {
-      return NextResponse.redirect(new URL("/login", request.url));
+    if (!profile?.role || profile.is_active === false) {
+      await supabase.auth.signOut();
+
+      const redirect = NextResponse.redirect(new URL("/login", request.url));
+
+      response.cookies.getAll().forEach((cookie) => {
+        redirect.cookies.set(cookie);
+      });
+
+      return redirect;
     }
 
     if (!canAccess(pathname, profile.role)) {
@@ -99,6 +128,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|.*\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

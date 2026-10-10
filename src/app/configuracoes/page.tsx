@@ -94,7 +94,7 @@ export default function ConfiguracoesPage() {
         <RouteGuard allowedRoles={['ADMIN']}>
             <PageContainer
                 title="Configurações"
-                description="Cadastros base usados em todo o sistema Matrix."
+                description="Cadastros base usados em todo o sistema."
             >
                 <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
                     {items.map((item) => {
@@ -104,9 +104,9 @@ export default function ConfiguracoesPage() {
                             <Link
                                 key={item.href}
                                 href={item.href}
-                                className="group rounded-3xl border border-zinc-200 bg-white p-6 shadow-xl shadow-zinc-200/50 transition-all duration-300 hover:-translate-y-1 hover:border-red-200 hover:shadow-red-100"
+                                className="group rounded-3xl border border-zinc-200 bg-white p-6 shadow-xl shadow-zinc-200/50 transition-all duration-300 hover:-translate-y-1 hover:border-brand-200 hover:shadow-brand-100"
                             >
-                                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-50 text-red-600 transition-all group-hover:bg-red-600 group-hover:text-white">
+                                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-50 text-brand-600 transition-all group-hover:bg-brand-600 group-hover:text-white">
                                     <Icon size={22} />
                                 </div>
 
@@ -118,7 +118,7 @@ export default function ConfiguracoesPage() {
                                     {item.description}
                                 </p>
 
-                                <span className="mt-5 inline-block text-sm font-semibold text-red-600">
+                                <span className="mt-5 inline-block text-sm font-semibold text-brand-600">
                                     Gerenciar →
                                 </span>
                             </Link>

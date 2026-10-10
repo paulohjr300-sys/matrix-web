@@ -1,26 +1,12 @@
 import { NextResponse } from "next/server";
-import { createSupabaseServerClient } from "../../../../lib/supabase-server";
+import { requireRole } from "../../../../lib/auth-server";
 import { supabaseAdmin } from "../../../../lib/supabase-admin";
 
 export async function POST(request: Request) {
-  const supabase = await createSupabaseServerClient();
+  const auth = await requireRole(["ADMIN"]);
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return NextResponse.json({ message: "Não autenticado." }, { status: 401 });
-  }
-
-  const { data: currentProfile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (currentProfile?.role !== "ADMIN") {
-    return NextResponse.json({ message: "Sem permissão." }, { status: 403 });
+  if (!auth.ok) {
+    return auth.response;
   }
 
   const body = await request.json();
@@ -60,6 +46,7 @@ export async function POST(request: Request) {
     name,
     email,
     role,
+    empresa_id: auth.empresaId,
   });
 
   if (profileError) {

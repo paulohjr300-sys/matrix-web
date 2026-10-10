@@ -1,14 +1,21 @@
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
+import { Inter, Quicksand } from 'next/font/google'
 import './globals.css'
 
 const inter = Inter({
   subsets: ['latin'],
 })
 
+// Fonte do logotipo "painel".
+const quicksand = Quicksand({
+  subsets: ['latin'],
+  weight: ['600'],
+  variable: '--font-quicksand',
+})
+
 export const metadata: Metadata = {
-  title: 'Matrix',
-  description: 'Sistema de Gestão de Veículos',
+  title: 'painel',
+  description: 'Gestão para revendas de veículos',
 }
 
 export default function RootLayout({
@@ -17,7 +24,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="pt-BR">
+    <html lang="pt-BR" className={quicksand.variable}>
       <body className={inter.className}>{children}</body>
     </html>
   )

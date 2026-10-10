@@ -223,7 +223,7 @@ export default function ModelosPage() {
                                 setModelName('')
                                 setBrandId('')
                             }}
-                            className="rounded-2xl bg-red-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-red-600/20 transition-all duration-300 hover:-translate-y-0.5 hover:bg-red-700"
+                            className="rounded-2xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-brand-600/20 transition-all duration-300 hover:-translate-y-0.5 hover:bg-brand-700"
                         >
                             {showForm ? 'Fechar' : '+ Novo modelo'}
                         </button>
@@ -231,7 +231,7 @@ export default function ModelosPage() {
                 >
                     <Link
                         href="/configuracoes"
-                        className="mb-6 inline-flex items-center gap-2 text-sm font-semibold text-zinc-500 transition hover:text-red-600"
+                        className="mb-6 inline-flex items-center gap-2 text-sm font-semibold text-zinc-500 transition hover:text-brand-600"
                     >
                         <ArrowLeft size={18} />
                         Voltar para configurações
@@ -253,7 +253,7 @@ export default function ModelosPage() {
                                         value={modelName}
                                         onChange={(event) => setModelName(event.target.value)}
                                         placeholder="Ex: HB20"
-                                        className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                                        className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10"
                                     />
                                 </div>
 
@@ -263,7 +263,7 @@ export default function ModelosPage() {
                                     <select
                                         value={brandId}
                                         onChange={(event) => setBrandId(event.target.value)}
-                                        className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                                        className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10"
                                     >
                                         <option value="">Selecione</option>
 

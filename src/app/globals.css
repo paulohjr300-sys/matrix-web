@@ -2,6 +2,23 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/* Paleta painel: Azul noite #042C53, Azul painel #185FA5, Âmbar ponteiro #EF9F27, Azul claro #85B7EB, Gelo #E6F1FB */
+@theme {
+  --color-brand-50: #e6f1fb;
+  --color-brand-100: #cce2f6;
+  --color-brand-200: #a9cdf1;
+  --color-brand-300: #85b7eb;
+  --color-brand-400: #4e8fd3;
+  --color-brand-500: #2a73bc;
+  --color-brand-600: #185fa5;
+  --color-brand-700: #134e89;
+  --color-brand-800: #0c3d6d;
+  --color-brand-900: #042c53;
+  --color-brand-950: #021c36;
+  --color-ponteiro: #ef9f27;
+  --font-logo: var(--font-quicksand), ui-rounded, sans-serif;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {

@@ -69,7 +69,7 @@ export default function AlterarSenhaPage() {
     }
 
     return (
-        <main className="flex min-h-screen items-center justify-center bg-zinc-950 p-6">
+        <main className="flex min-h-screen items-center justify-center bg-brand-900 p-6">
             <div className="w-full max-w-md rounded-3xl border border-zinc-800 bg-white p-8 shadow-2xl">
                 <div className="mb-8 text-center">
                     <h1 className="text-3xl font-black tracking-widest text-zinc-950">
@@ -96,7 +96,7 @@ export default function AlterarSenhaPage() {
                             value={password}
                             onChange={(event) => setPassword(event.target.value)}
                             placeholder="Mínimo 6 caracteres"
-                            className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                            className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10"
                         />
                     </div>
 
@@ -109,14 +109,14 @@ export default function AlterarSenhaPage() {
                             value={confirmPassword}
                             onChange={(event) => setConfirmPassword(event.target.value)}
                             placeholder="Digite novamente"
-                            className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                            className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10"
                         />
                     </div>
 
                     <button
                         onClick={handleChangePassword}
                         disabled={loading}
-                        className="w-full rounded-xl bg-red-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-50"
+                        className="w-full rounded-xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
                     >
                         {loading ? 'Salvando...' : 'Salvar nova senha'}
                     </button>
