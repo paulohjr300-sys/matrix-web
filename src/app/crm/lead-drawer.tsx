@@ -11,11 +11,13 @@ import {
     MessageCircle,
     Phone,
     Send,
+    Trash2,
     X,
 } from 'lucide-react'
 
 import { supabase } from '../../lib/supabase'
 import { CurrencyInput } from '../components/currency-input'
+import { ConfirmDialog } from '../components/ui/confirm-dialog'
 import {
     ETAPAS,
     LEAD_SELECT,
@@ -98,6 +100,7 @@ export function LeadDrawer({
     veiculos,
     onClose,
     onChanged,
+    onDeleted,
     showToast,
 }: {
     lead: CrmLead
@@ -105,6 +108,7 @@ export function LeadDrawer({
     veiculos: VeiculoOpcao[]
     onClose: () => void
     onChanged: (lead: CrmLead) => void
+    onDeleted: (leadId: string) => void
     showToast: (type: 'success' | 'error', title: string, description?: string) => void
 }) {
     const [atividades, setAtividades] = useState<Atividade[]>([])
@@ -124,6 +128,8 @@ export function LeadDrawer({
     const [vendaPagamento, setVendaPagamento] = useState('Financiamento')
     const [vendaData, setVendaData] = useState(new Date().toISOString().slice(0, 10))
     const [vendendo, setVendendo] = useState(false)
+    const [excluirAberto, setExcluirAberto] = useState(false)
+    const [excluindo, setExcluindo] = useState(false)
 
     async function loadAtividades() {
         const { data } = await supabase
@@ -232,6 +238,23 @@ export function LeadDrawer({
         await registrar('NOTA', `Concluído: ${tipo}`)
         await update({ proxima_acao_em: null, proxima_acao_tipo: null })
         setAcaoQuando('')
+    }
+
+    async function excluir() {
+        setExcluindo(true)
+
+        const { error } = await supabase.from('leads').delete().eq('id', lead.id)
+
+        setExcluindo(false)
+        setExcluirAberto(false)
+
+        if (error) {
+            showToast('error', 'Não foi possível excluir', error.message)
+            return
+        }
+
+        showToast('success', 'Lead excluído')
+        onDeleted(lead.id)
     }
 
     async function gerarVenda() {
@@ -672,8 +695,29 @@ export function LeadDrawer({
                             </li>
                         </ol>
                     </section>
+
+                    <div className="border-t border-zinc-100 pt-5">
+                        <button
+                            type="button"
+                            onClick={() => setExcluirAberto(true)}
+                            className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50"
+                        >
+                            <Trash2 size={16} />
+                            Excluir lead
+                        </button>
+                    </div>
                 </div>
             </aside>
+
+            <ConfirmDialog
+                open={excluirAberto}
+                title="Excluir lead"
+                description="O lead e todo o histórico de atendimento serão apagados. Essa ação não pode ser desfeita."
+                confirmText="Excluir"
+                loading={excluindo}
+                onCancel={() => setExcluirAberto(false)}
+                onConfirm={() => void excluir()}
+            />
         </div>
     )
 }

@@ -14,7 +14,6 @@ import {
   Calculator,
   LogOut,
   ExternalLink,
-  UserRound,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { PainelLogo } from './brand/painel-logo'
@@ -33,12 +32,6 @@ const menus = [
     label: 'Funil de vendas',
     href: '/crm',
     icon: KanbanSquare,
-    roles: ['ADMIN', 'GERENTE', 'VENDEDOR'],
-  },
-  {
-    label: 'Leads',
-    href: '/leads',
-    icon: UserRound,
     roles: ['ADMIN', 'GERENTE', 'VENDEDOR'],
   },
   {

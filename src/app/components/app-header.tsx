@@ -82,7 +82,7 @@ export function AppHeader({ title, description }: AppHeaderProps) {
                 title: count === 1 ? '1 lead novo' : `${count} leads novos`,
                 description: 'Existem contatos novos aguardando atendimento.',
                 count,
-                href: '/leads?status=NOVO',
+                href: '/crm',
                 icon: 'lead',
             })
         }

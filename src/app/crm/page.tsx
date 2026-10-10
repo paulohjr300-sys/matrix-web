@@ -147,7 +147,7 @@ export default function CrmPage() {
 
         if (error || !data) {
             substituir(anterior)
-            showToast('error', 'Erro', 'Não foi possível mover o lead.')
+            showToast('error', 'Não foi possível mover o lead', error?.message)
             return
         }
 
@@ -330,8 +330,9 @@ export default function CrmPage() {
                 {loading ? (
                     <p className="mt-8 text-sm text-zinc-500">Carregando funil...</p>
                 ) : (
-                    <div className="-mx-8 mt-6 overflow-x-auto px-8 pb-4">
-                        <div className="flex min-w-max gap-4">
+                    <div className="-mx-8 mt-6 overflow-x-auto px-8 pb-4 xl:mx-0 xl:overflow-visible xl:px-0">
+                        <div className="flex min-w-max gap-4 xl:grid xl:min-w-0 xl:grid-cols-6 xl:gap-3">
+                            {/* Telas grandes: 6 colunas dividindo a largura, sem rolagem lateral. Menores: rolagem lateral. */}
                             {ETAPAS.map((etapa) => {
                                 const daEtapa = filtrados.filter((lead) => lead.status === etapa.value)
                                 const total = daEtapa.reduce((soma, lead) => soma + valorDoLead(lead), 0)
@@ -350,13 +351,13 @@ export default function CrmPage() {
                                             const id = e.dataTransfer.getData('text/plain')
                                             if (id) void moverPara(id, etapa.value)
                                         }}
-                                        className={`flex w-72 shrink-0 flex-col rounded-3xl p-3 transition ${colunaAlvo === etapa.value ? 'bg-brand-50 ring-2 ring-brand-300' : 'bg-zinc-200/50'
+                                        className={`flex w-72 shrink-0 flex-col rounded-3xl p-3 transition xl:w-auto xl:min-w-0 xl:p-2 ${colunaAlvo === etapa.value ? 'bg-brand-50 ring-2 ring-brand-300' : 'bg-zinc-200/50'
                                             }`}
                                     >
-                                        <div className="flex items-center justify-between px-2 pb-3 pt-1">
-                                            <div className="flex items-center gap-2">
+                                        <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5 px-2 pb-3 pt-1">
+                                            <div className="flex min-w-0 items-center gap-2">
                                                 <span className={`h-2.5 w-2.5 rounded-full ${etapa.dot}`} />
-                                                <span className="text-sm font-bold text-zinc-900">{etapa.label}</span>
+                                                <span className="truncate text-sm font-bold text-zinc-900">{etapa.label}</span>
                                                 <span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold text-zinc-600">
                                                     {daEtapa.length}
                                                 </span>
@@ -441,6 +442,10 @@ export default function CrmPage() {
                     veiculos={veiculos}
                     onClose={() => setSelecionadoId(null)}
                     onChanged={substituir}
+                    onDeleted={(id) => {
+                        setLeads((current) => current.filter((item) => item.id !== id))
+                        setSelecionadoId(null)
+                    }}
                     showToast={showToast}
                 />
             )}
@@ -532,7 +537,7 @@ function LeadCard({
             onDragStart={onDragStart}
             onDragEnd={onDragEnd}
             onClick={onOpen}
-            className={`cursor-pointer rounded-2xl bg-white p-4 shadow-sm ring-1 transition hover:shadow-md ${sla ? 'ring-red-300' : 'ring-zinc-200'
+            className={`min-w-0 cursor-pointer rounded-2xl bg-white p-4 shadow-sm xl:p-3 ring-1 transition hover:shadow-md ${sla ? 'ring-red-300' : 'ring-zinc-200'
                 } ${arrastando ? 'opacity-40' : ''}`}
         >
             <div className="flex items-start justify-between gap-2">
@@ -610,7 +615,7 @@ function LeadCard({
                         value={lead.status}
                         onChange={(e) => onMover(e.target.value as Etapa)}
                         aria-label="Mover para etapa"
-                        className="max-w-[110px] rounded-lg border border-zinc-200 bg-white px-1.5 py-1 text-[11px] text-zinc-600 outline-none"
+                        className="max-w-[110px] rounded-lg border border-zinc-200 bg-white px-1.5 py-1 text-[11px] text-zinc-600 outline-none xl:hidden"
                     >
                         {ETAPAS.map((etapa) => (
                             <option key={etapa.value} value={etapa.value}>
