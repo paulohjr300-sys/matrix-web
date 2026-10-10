@@ -3,6 +3,7 @@ import { requireRole } from "../../../lib/auth-server";
 import { supabaseAdmin } from "../../../lib/supabase-admin";
 import { integrationsAllowed } from "../../../lib/integrations/core";
 import { mercadoLivreConfigProblem } from "../../../lib/integrations/mercadolivre";
+import { olxConfigProblem } from "../../../lib/integrations/olx";
 
 // Situação das integrações da loja (sem nenhum token).
 export async function GET() {
@@ -33,7 +34,13 @@ export async function GET() {
         conexao: find("mercadolivre"),
       },
       { portal: "webmotors", nome: "Webmotors", disponivel: false, conexao: null },
-      { portal: "olx", nome: "OLX", disponivel: false, conexao: null },
+      {
+        portal: "olx",
+        nome: "OLX",
+        disponivel: true,
+        pendencia: auth.role === "ADMIN" ? olxConfigProblem() : null,
+        conexao: find("olx"),
+      },
     ],
   });
 }

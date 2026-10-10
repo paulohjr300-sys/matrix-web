@@ -13,6 +13,7 @@ export type Integracao = {
   refresh_token_enc: string | null;
   token_expira_em: string | null;
   ultimo_erro: string | null;
+  config?: Record<string, unknown> | null;
 };
 
 export type AnuncioStatus = "pendente" | "publicado" | "pausado" | "encerrado" | "erro";

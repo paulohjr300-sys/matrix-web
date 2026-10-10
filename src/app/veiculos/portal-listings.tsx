@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { ExternalLink, Loader2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import { OlxCatalogPicker, type OlxCatalogo } from './olx-catalog-picker'
 
 type Anuncio = {
     portal: string
@@ -11,6 +12,7 @@ type Anuncio = {
     external_url: string | null
     ultimo_erro: string | null
     sincronizado_em: string | null
+    dados: { marcaId?: string; modeloId?: string; versaoId?: string; versaoNome?: string } | null
 }
 
 type PortalInfo = {
@@ -20,10 +22,13 @@ type PortalInfo = {
     conexao: { status: string } | null
 }
 
-type Action = 'publicar' | 'atualizar' | 'pausar' | 'reativar' | 'encerrar'
+type Action = 'publicar' | 'atualizar' | 'pausar' | 'reativar' | 'encerrar' | 'verificar'
+
+// A OLX não tem pausar e processa os envios em fila.
+const SEM_PAUSA = new Set(['olx'])
 
 const STATUS_LABEL: Record<Anuncio['status'], string> = {
-    pendente: 'Pendente',
+    pendente: 'Aguardando o portal',
     publicado: 'Publicado',
     pausado: 'Pausado',
     encerrado: 'Encerrado',
@@ -31,7 +36,7 @@ const STATUS_LABEL: Record<Anuncio['status'], string> = {
 }
 
 const STATUS_STYLE: Record<Anuncio['status'], string> = {
-    pendente: 'bg-zinc-100 text-zinc-600',
+    pendente: 'bg-sky-50 text-sky-700',
     publicado: 'bg-emerald-50 text-emerald-700',
     pausado: 'bg-amber-50 text-amber-700',
     encerrado: 'bg-zinc-100 text-zinc-600',
@@ -53,13 +58,14 @@ export function PortalListings({
     const [liberado, setLiberado] = useState(true)
     const [anuncios, setAnuncios] = useState<Anuncio[]>([])
     const [running, setRunning] = useState<string | null>(null)
+    const [catalogoOlx, setCatalogoOlx] = useState<OlxCatalogo | null>(null)
 
     const load = useCallback(async () => {
         const [integracoesResponse, anunciosResult] = await Promise.all([
             fetch('/api/integracoes').then((response) => response.json()).catch(() => null),
             supabase
                 .from('anuncios_portal')
-                .select('portal, status, external_url, ultimo_erro, sincronizado_em')
+                .select('portal, status, external_url, ultimo_erro, sincronizado_em, dados')
                 .eq('vehicle_id', vehicleId),
         ])
 
@@ -74,13 +80,23 @@ export function PortalListings({
     }, [load])
 
     async function run(portal: string, action: Action) {
+        if (portal === 'olx' && action === 'publicar' && !catalogoOlx) {
+            onMessage('error', 'Escolha o veículo no catálogo da OLX', 'Selecione marca, modelo e versão antes de publicar.')
+            return
+        }
+
         setRunning(`${portal}:${action}`)
 
         try {
             const response = await fetch('/api/integracoes/anuncios', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ vehicleId, portal, action }),
+                body: JSON.stringify({
+                    vehicleId,
+                    portal,
+                    action,
+                    ...(portal === 'olx' && action === 'publicar' ? { catalogo: catalogoOlx } : {}),
+                }),
             })
 
             const result = await response.json().catch(() => ({}))
@@ -89,7 +105,8 @@ export function PortalListings({
                 onMessage('error', 'Não foi possível concluir', result.message)
             } else {
                 const labels: Record<Action, string> = {
-                    publicar: 'Anúncio publicado',
+                    publicar: portal === 'olx' ? 'Enviado para a OLX' : 'Anúncio publicado',
+                    verificar: 'Situação atualizada',
                     atualizar: 'Anúncio atualizado',
                     pausar: 'Anúncio pausado',
                     reativar: 'Anúncio reativado',
@@ -122,7 +139,7 @@ export function PortalListings({
 
             {liberado && conectados.length === 0 && (
                 <p className="mt-3 text-sm text-zinc-500">
-                    Nenhum portal conectado. Conecte a conta do Mercado Livre em Configurações &gt; Integrações.
+                    Nenhum portal conectado. Conecte as contas em Configurações &gt; Integrações.
                 </p>
             )}
 
@@ -168,12 +185,15 @@ export function PortalListings({
                                 </div>
 
                                 <div className="flex flex-wrap gap-2">
-                                    {(!status || status === 'erro' || status === 'encerrado' || status === 'pendente') &&
+                                    {(!status || status === 'erro' || status === 'encerrado' || (status === 'pendente' && item.portal !== 'olx')) &&
                                         button('publicar', 'Publicar', 'bg-brand-600 text-white hover:bg-brand-700')}
+                                    {status === 'pendente' && item.portal === 'olx' &&
+                                        button('verificar', 'Verificar agora', 'bg-white text-zinc-700 ring-1 ring-zinc-200 hover:bg-zinc-100')}
                                     {status === 'publicado' && (
                                         <>
                                             {button('atualizar', 'Atualizar', 'bg-white text-zinc-700 ring-1 ring-zinc-200 hover:bg-zinc-100')}
-                                            {button('pausar', 'Pausar', 'bg-white text-zinc-700 ring-1 ring-zinc-200 hover:bg-zinc-100')}
+                                            {!SEM_PAUSA.has(item.portal) &&
+                                                button('pausar', 'Pausar', 'bg-white text-zinc-700 ring-1 ring-zinc-200 hover:bg-zinc-100')}
                                         </>
                                     )}
                                     {status === 'pausado' &&
@@ -182,6 +202,28 @@ export function PortalListings({
                                         button('encerrar', 'Encerrar', 'bg-red-50 text-red-700 hover:bg-red-100')}
                                 </div>
                             </div>
+
+                            {item.portal === 'olx' && (!status || status === 'erro' || status === 'encerrado') && (
+                                <OlxCatalogPicker
+                                    vehicleId={vehicleId}
+                                    inicial={
+                                        anuncio?.dados?.marcaId && anuncio.dados.modeloId && anuncio.dados.versaoId
+                                            ? {
+                                                marcaId: anuncio.dados.marcaId,
+                                                modeloId: anuncio.dados.modeloId,
+                                                versaoId: anuncio.dados.versaoId,
+                                            }
+                                            : null
+                                    }
+                                    onChange={setCatalogoOlx}
+                                />
+                            )}
+
+                            {status === 'pendente' && item.portal === 'olx' && !anuncio?.ultimo_erro && (
+                                <p className="mt-3 text-sm text-sky-700">
+                                    Enviado. A OLX publica em fila e pode levar alguns minutos; clique em &quot;Verificar agora&quot; para ver o resultado.
+                                </p>
+                            )}
 
                             {anuncio?.ultimo_erro && (
                                 <p className="mt-3 text-sm text-red-700">{anuncio.ultimo_erro}</p>

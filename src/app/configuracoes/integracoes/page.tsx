@@ -10,6 +10,7 @@ import { RouteGuard } from '../../components/auth/route-guard'
 import { Toast } from '../../components/ui/toast'
 import { ConfirmDialog } from '../../components/ui/confirm-dialog'
 import { PacotesMercadoLivre } from './pacotes-ml'
+import { PlanoOlx } from './plano-olx'
 
 type Conexao = {
     status: 'conectado' | 'erro' | 'desconectado'
@@ -30,7 +31,7 @@ const DESCRICOES: Record<PortalInfo['portal'], string> = {
     mercadolivre:
         'Publique o estoque no Mercado Livre Veículos. Preço, fotos e situação são atualizados quando você salva o veículo, e o anúncio é encerrado quando ele é vendido. É preciso ter um pacote de anúncios contratado com o Mercado Livre.',
     webmotors: 'Em breve. A integração depende de homologação com a Webmotors.',
-    olx: 'Em breve. A integração depende de parceria com a OLX Autos.',
+    olx: 'Publique o estoque na OLX Autos e receba os leads da OLX direto no funil de vendas. Vendido sai da OLX sozinho. A conta precisa de um plano OLX para empresas (Essencial, Plus ou Premium Empresa).',
 }
 
 export default function IntegracoesPage() {
@@ -227,6 +228,7 @@ function Integracoes() {
                                     )}
 
                                     {item.portal === 'mercadolivre' && conectado && <PacotesMercadoLivre />}
+                                    {item.portal === 'olx' && conectado && <PlanoOlx />}
 
                                     {item.portal === 'mercadolivre' && usuarioTeste && item.conexao?.status === 'conectado' && (
                                         <div className="mt-4 rounded-xl bg-zinc-50 p-3 text-sm ring-1 ring-zinc-200">
