@@ -44,6 +44,9 @@ function Integracoes() {
     const searchParams = useSearchParams()
     const [portais, setPortais] = useState<PortalInfo[]>([])
     const [liberado, setLiberado] = useState(true)
+    const [usuarioTeste, setUsuarioTeste] = useState(false)
+    const [criandoTeste, setCriandoTeste] = useState(false)
+    const [contaTeste, setContaTeste] = useState<{ nickname: string; password: string; email: string | null } | null>(null)
     const [loading, setLoading] = useState(true)
     const [disconnectTarget, setDisconnectTarget] = useState<PortalInfo | null>(null)
     const [disconnecting, setDisconnecting] = useState(false)
@@ -67,6 +70,7 @@ function Integracoes() {
         if (response.ok) {
             setPortais(result.portais || [])
             setLiberado(result.liberado !== false)
+            setUsuarioTeste(result.usuarioTeste === true)
         } else {
             showToast('error', 'Erro', result.message || 'Não foi possível carregar as integrações.')
         }
@@ -95,6 +99,22 @@ function Integracoes() {
             window.history.replaceState(null, '', '/configuracoes/integracoes')
         }
     }, [searchParams])
+
+    async function criarUsuarioTeste() {
+        setCriandoTeste(true)
+
+        const response = await fetch('/api/integracoes/mercadolivre/usuario-teste', { method: 'POST' })
+        const result = await response.json().catch(() => ({}))
+
+        setCriandoTeste(false)
+
+        if (!response.ok) {
+            showToast('error', 'Não foi possível criar', result.message)
+            return
+        }
+
+        setContaTeste(result)
+    }
 
     async function handleDisconnect() {
         if (!disconnectTarget) return
@@ -203,6 +223,31 @@ function Integracoes() {
 
                                     {comErro && item.conexao?.ultimo_erro && (
                                         <p className="mt-4 text-sm text-red-700">{item.conexao.ultimo_erro}</p>
+                                    )}
+
+                                    {item.portal === 'mercadolivre' && usuarioTeste && item.conexao?.status === 'conectado' && (
+                                        <div className="mt-4 rounded-xl bg-zinc-50 p-3 text-sm ring-1 ring-zinc-200">
+                                            <p className="font-semibold text-zinc-800">Ferramenta de teste</p>
+                                            {contaTeste ? (
+                                                <div className="mt-2 space-y-1 text-zinc-700">
+                                                    <p>Usuário: <strong className="select-all">{contaTeste.nickname}</strong></p>
+                                                    <p>Senha: <strong className="select-all">{contaTeste.password}</strong></p>
+                                                    {contaTeste.email && <p>E-mail: <strong className="select-all">{contaTeste.email}</strong></p>}
+                                                    <p className="pt-1 text-xs text-zinc-500">
+                                                        Anote agora: a senha não aparece de novo.
+                                                    </p>
+                                                </div>
+                                            ) : (
+                                                <button
+                                                    type="button"
+                                                    disabled={criandoTeste}
+                                                    onClick={() => void criarUsuarioTeste()}
+                                                    className="mt-2 rounded-lg bg-zinc-900 px-3 py-2 text-xs font-semibold text-white hover:bg-zinc-800 disabled:opacity-50"
+                                                >
+                                                    {criandoTeste ? 'Criando...' : 'Criar usuário de teste do Mercado Livre'}
+                                                </button>
+                                            )}
+                                        </div>
                                     )}
 
                                     {item.pendencia && (

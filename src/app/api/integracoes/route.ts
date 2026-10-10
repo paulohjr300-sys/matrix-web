@@ -21,6 +21,8 @@ export async function GET() {
 
   return NextResponse.json({
     liberado: await integrationsAllowed(auth.empresaId),
+    // Ferramenta de desenvolvimento: criar usuário de teste do ML.
+    usuarioTeste: process.env.ML_ALLOW_TEST_USERS === "true" && auth.role === "ADMIN",
     portais: [
       {
         portal: "mercadolivre",

@@ -184,7 +184,7 @@ export async function saveConnection(empresaId: string, tokens: TokenResponse) {
 // Token válido da loja. O refresh_token do ML é de uso único: a gravação
 // só vale se ninguém trocou o token no meio do caminho (outra requisição
 // renovando ao mesmo tempo); se trocou, usa o que ela salvou.
-async function accessToken(empresaId: string): Promise<string> {
+export async function accessToken(empresaId: string): Promise<string> {
   const integracao = await getIntegracao(empresaId, "mercadolivre");
 
   if (!integracao || integracao.status === "desconectado" || !integracao.refresh_token_enc) {
@@ -251,7 +251,7 @@ async function accessToken(empresaId: string): Promise<string> {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function mlFetch(token: string, path: string, init: RequestInit = {}): Promise<any> {
+export async function mlFetch(token: string, path: string, init: RequestInit = {}): Promise<any> {
   const response = await fetch(`${API}${path}`, {
     ...init,
     headers: {
