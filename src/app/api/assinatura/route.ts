@@ -12,11 +12,16 @@ export async function GET(request: Request) {
   const auth = await requireRole(["ADMIN", "GERENTE", "VENDEDOR"]);
   if (!auth.ok) return auth.response;
 
+  let erroConferencia = false;
+
   try {
     // Administrador na tela de Assinatura: confere no Asaas o que o webhook
     // possa não ter aplicado.
     if (auth.role === "ADMIN" && asaasConfigurado() && new URL(request.url).searchParams.has("conferir")) {
-      await conferirNoAsaas(auth.empresaId).catch((error) => console.error("Erro ao conferir no Asaas", error));
+      await conferirNoAsaas(auth.empresaId).catch((error) => {
+        console.error("Erro ao conferir no Asaas", error);
+        erroConferencia = true;
+      });
     }
 
     // Aproveita a consulta para manter o site da loja em dia com o bloqueio.
@@ -32,6 +37,7 @@ export async function GET(request: Request) {
       bloqueado: situacao.bloqueado,
       motivo: situacao.motivo,
       admin,
+      erroConferencia,
       cobrancaDisponivel: asaasConfigurado(),
       ...(admin
         ? {

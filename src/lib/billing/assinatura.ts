@@ -314,6 +314,16 @@ export async function assinar(
   const valor = PLANOS[pedido.plano]?.preco;
   if (!valor) throw new AsaasError("Este plano ainda não está disponível para contratação.");
 
+  // Antes de cobrar qualquer coisa: aplica diferenças já pagas (o plano pode
+  // já ter mudado) e garante que o banco grava a assinatura; se não gravar,
+  // para aqui, sem criar cobrança no Asaas.
+  try {
+    await conferirNoAsaas(empresaId);
+  } catch (error) {
+    console.error("Erro ao conferir assinatura antes da troca", error);
+    throw new AsaasError("Não foi possível trocar o plano agora. Avise o suporte da plataforma.", 500);
+  }
+
   const { empresa, assinatura, pagamentos } = await carregar(empresaId);
   if (!empresa.ativo) throw new AsaasError("A loja está desativada. Fale com o suporte.", 403);
 
@@ -325,6 +335,16 @@ export async function assinar(
   //   - sem mês pago (teste, fatura em aberto): vale na hora.
   if (assinatura?.asaas_subscription_id && assinatura.asaas_customer_id && empresa.assinatura_status !== "cancelada") {
     const subscriptionId = assinatura.asaas_subscription_id;
+
+    // A mesma diferença já gerada e ainda não paga: devolve ela, sem cobrar
+    // de novo.
+    const pendente = assinatura.upgrade_pagamento_id
+      ? pagamentos.find((p) => p.id === assinatura.upgrade_pagamento_id && EM_ABERTO.includes(p.status))
+      : null;
+
+    if (pendente && pedido.plano === assinatura.plano && pedido.formaPagamento === assinatura.forma_pagamento) {
+      return { faturaUrl: pendente.fatura_url, nova: false, diferenca: pendente.valor, agendado: false };
+    }
 
     const atualizada = await atualizarAssinatura(subscriptionId, {
       valor,
@@ -375,7 +395,7 @@ export async function assinar(
       }
     }
 
-    await supabaseAdmin
+    const { error: erroGravar } = await supabaseAdmin
       .from("assinaturas")
       .update({
         plano: pedido.plano,
@@ -386,6 +406,11 @@ export async function assinar(
         updated_at: new Date().toISOString(),
       })
       .eq("empresa_id", empresaId);
+
+    if (erroGravar) {
+      console.error("Erro ao gravar troca de plano", erroGravar);
+      throw new AsaasError("Não foi possível salvar a troca de plano. Avise o suporte da plataforma.", 500);
+    }
 
     if (planoVigente !== empresa.plano) {
       await supabaseAdmin.from("empresas").update({ plano: planoVigente }).eq("id", empresaId);
@@ -477,7 +502,7 @@ export async function assinar(
 //   - foi paga uma mensalidade da assinatura (fim do mês já pago, no caso
 //     de redução de plano, ou upgrade cuja diferença ficou sem pagar).
 async function aplicarPlanoContratado(empresaId: string, pagamento: AsaasPagamento) {
-  const [{ data: assinatura }, { data: empresa }] = await Promise.all([
+  const [{ data: assinatura, error: erroAssinatura }, { data: empresa, error: erroEmpresa }] = await Promise.all([
     supabaseAdmin
       .from("assinaturas")
       .select("plano, valor, asaas_subscription_id, upgrade_pagamento_id")
@@ -485,6 +510,12 @@ async function aplicarPlanoContratado(empresaId: string, pagamento: AsaasPagamen
       .maybeSingle(),
     supabaseAdmin.from("empresas").select("plano").eq("id", empresaId).single(),
   ]);
+
+  // Erro de banco: falha de verdade, para o webhook responder erro e o
+  // Asaas reenviar o aviso depois.
+  if (erroAssinatura || erroEmpresa) {
+    throw new Error(`Erro ao ler a assinatura: ${(erroAssinatura || erroEmpresa)!.message}`);
+  }
 
   if (!assinatura || !empresa) return;
 
@@ -542,12 +573,13 @@ async function aplicarPlanoContratado(empresaId: string, pagamento: AsaasPagamen
 // aplicou (aviso perdido, fila do webhook pausada...). Usada ao abrir a
 // tela de Assinatura.
 export async function conferirNoAsaas(empresaId: string) {
-  const { data: assinatura } = await supabaseAdmin
+  const { data: assinatura, error } = await supabaseAdmin
     .from("assinaturas")
     .select("asaas_subscription_id, upgrade_pagamento_id")
     .eq("empresa_id", empresaId)
     .maybeSingle();
 
+  if (error) throw new Error(`Erro ao ler a assinatura: ${error.message}`);
   if (!assinatura) return;
 
   if (assinatura.asaas_subscription_id) {

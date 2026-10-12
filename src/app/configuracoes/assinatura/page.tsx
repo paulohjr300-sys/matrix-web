@@ -118,6 +118,10 @@ export default function AssinaturaPage() {
             return
         }
 
+        if (result.erroConferencia) {
+            showToast('error', 'Pagamentos não conferidos', 'Não foi possível conferir os pagamentos no Asaas. Avise o suporte da plataforma.')
+        }
+
         setSituacao(result)
         setPlano(result.assinatura?.plano || result.plano || 'pro')
         if (result.assinatura?.formaPagamento) setForma(result.assinatura.formaPagamento)
