@@ -3,6 +3,7 @@ import { requireRole } from "../../../../lib/auth-server";
 import { PortalError } from "../../../../lib/integrations/core";
 import { syncMercadoLivre } from "../../../../lib/integrations/mercadolivre";
 import { syncOlx } from "../../../../lib/integrations/olx";
+import { marcarPostsVendidos } from "../../../../lib/integrations/meta-posts";
 
 // Publicar envolve várias chamadas ao Mercado Livre (token, CEP, anúncio,
 // fotos): mais tempo que o limite padrão da função na Vercel.
@@ -38,6 +39,13 @@ export async function POST(request: Request) {
   } catch (error) {
     erros.push(`OLX: ${error instanceof PortalError ? error.message : "erro inesperado"}`);
     if (!(error instanceof PortalError)) console.error(error);
+  }
+
+  // Vendido: marca "VENDIDO" nos posts do carro no Facebook/Instagram.
+  try {
+    erros.push(...(await marcarPostsVendidos(auth.empresaId, vehicleId)));
+  } catch (error) {
+    console.error("Erro ao marcar VENDIDO nos posts", error);
   }
 
   return NextResponse.json({ erros });

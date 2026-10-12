@@ -3,6 +3,7 @@ import { supabaseAdmin } from "../../../../lib/supabase-admin";
 import { PortalError } from "../../../../lib/integrations/core";
 import { runMercadoLivre } from "../../../../lib/integrations/mercadolivre";
 import { runOlx } from "../../../../lib/integrations/olx";
+import { marcarPostsVendidos } from "../../../../lib/integrations/meta-posts";
 
 export const maxDuration = 60;
 
@@ -66,5 +67,30 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.json({ encerrados, verificados, erros });
+  // Posts de carros vendidos que ainda não foram marcados "VENDIDO".
+  const { data: postsVendidos } = await supabaseAdmin
+    .from("posts_redes")
+    .select("empresa_id, vehicle_id, vehicles!inner(status)")
+    .is("vendido_em", null)
+    .is("vendido_erro", null)
+    .eq("vehicles.status", "VENDIDO")
+    .limit(50);
+
+  let postsMarcados = 0;
+  const feitos = new Set<string>();
+
+  for (const post of postsVendidos || []) {
+    if (!post.vehicle_id || feitos.has(post.vehicle_id)) continue;
+    feitos.add(post.vehicle_id);
+
+    try {
+      const avisos = await marcarPostsVendidos(post.empresa_id, post.vehicle_id);
+      if (avisos.length) erros.push(...avisos.map((aviso) => `meta ${post.vehicle_id}: ${aviso}`));
+      else postsMarcados++;
+    } catch (err) {
+      erros.push(`meta ${post.vehicle_id}: ${motivo(err)}`);
+    }
+  }
+
+  return NextResponse.json({ encerrados, verificados, postsMarcados, erros });
 }

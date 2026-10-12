@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Camera, Check, Copy, Download, Loader2, Share2, X } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { getEmpresaId, getSiteUrl } from '../../lib/tenant'
@@ -30,6 +30,32 @@ export function CriarPost({
     onMessage: (type: 'success' | 'error', title: string, description?: string) => void
 }) {
     const [aberto, setAberto] = useState(false)
+    const [posts, setPosts] = useState<PostPublicado[]>([])
+
+    const carregarPosts = useCallback(async () => {
+        const response = await fetch(`/api/integracoes/meta/posts?vehicleId=${vehicleId}`, { cache: 'no-store' })
+        if (response.ok) setPosts((await response.json()).posts || [])
+    }, [vehicleId])
+
+    useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- carga ao abrir o veículo
+        void carregarPosts()
+    }, [carregarPosts])
+
+    async function marcarEditado(id: string) {
+        const response = await fetch('/api/integracoes/meta/posts', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id }),
+        })
+
+        if (!response.ok) {
+            onMessage('error', 'Não foi possível atualizar')
+            return
+        }
+
+        await carregarPosts()
+    }
 
     return (
         <>
@@ -47,11 +73,73 @@ export function CriarPost({
                         <Camera size={16} /> Criar post
                     </button>
                 </div>
+
+                {posts.length > 0 && (
+                    <div className="mt-4 space-y-2">
+                        <p className="text-xs font-semibold uppercase text-zinc-500">Publicados pelo painel</p>
+                        {posts.map((post) => {
+                            const rede = post.rede === 'instagram' ? 'Instagram' : 'Facebook'
+                            const quando = new Date(post.created_at).toLocaleDateString('pt-BR')
+
+                            return (
+                                <div
+                                    key={post.id}
+                                    className={`flex flex-wrap items-center justify-between gap-2 rounded-xl px-3 py-2 text-sm ${post.vendido_erro && !post.vendido_em ? 'bg-amber-50 text-amber-900' : 'bg-zinc-50 text-zinc-700'}`}
+                                >
+                                    <span>
+                                        <strong>{rede}</strong> · {quando}
+                                        {post.vendido_em && ' · marcado VENDIDO'}
+                                        {post.vendido_erro && !post.vendido_em && ' · carro vendido: edite o post pelo app e escreva "VENDIDO"'}
+                                    </span>
+                                    <span className="flex items-center gap-3">
+                                        {post.url && (
+                                            <a
+                                                href={post.url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="font-semibold text-brand-600 hover:underline"
+                                            >
+                                                Ver post
+                                            </a>
+                                        )}
+                                        {post.vendido_erro && !post.vendido_em && (
+                                            <button
+                                                type="button"
+                                                onClick={() => void marcarEditado(post.id)}
+                                                className="font-semibold text-zinc-700 hover:underline"
+                                            >
+                                                Já editei
+                                            </button>
+                                        )}
+                                    </span>
+                                </div>
+                            )
+                        })}
+                    </div>
+                )}
             </div>
 
-            {aberto && <JanelaPost vehicleId={vehicleId} onClose={() => setAberto(false)} onMessage={onMessage} />}
+            {aberto && (
+                <JanelaPost
+                    vehicleId={vehicleId}
+                    onClose={() => {
+                        setAberto(false)
+                        void carregarPosts()
+                    }}
+                    onMessage={onMessage}
+                />
+            )}
         </>
     )
+}
+
+type PostPublicado = {
+    id: string
+    rede: 'instagram' | 'facebook'
+    url: string | null
+    created_at: string
+    vendido_em: string | null
+    vendido_erro: string | null
 }
 
 function JanelaPost({

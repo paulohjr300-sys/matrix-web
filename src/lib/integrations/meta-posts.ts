@@ -443,6 +443,96 @@ async function postarFacebook(paginaId: string, token: string, fotos: string[], 
   return { id: post.id, url: `https://www.facebook.com/${post.id}` };
 }
 
+// Carro vendido: marca "VENDIDO" nos posts dele que o painel publicou.
+// No Facebook a API deixa editar o texto do post: entra "✅ VENDIDO" no
+// começo da legenda. O Instagram não deixa editar a legenda de post já
+// publicado: o post fica com o motivo em vendido_erro e o painel mostra o
+// link para a loja editar pelo app. Devolve avisos para o lojista.
+export const MARCA_VENDIDO = "✅ VENDIDO";
+
+export async function marcarPostsVendidos(empresaId: string, vehicleId: string) {
+  const { data: veiculo } = await supabaseAdmin
+    .from("vehicles")
+    .select("status")
+    .eq("id", vehicleId)
+    .eq("empresa_id", empresaId)
+    .maybeSingle();
+
+  if (veiculo?.status !== "VENDIDO") return [];
+
+  const { data: posts } = await supabaseAdmin
+    .from("posts_redes")
+    .select("id, rede, external_id")
+    .eq("empresa_id", empresaId)
+    .eq("vehicle_id", vehicleId)
+    .is("vendido_em", null)
+    .is("vendido_erro", null);
+
+  const pendentes = (posts || []).filter((post) => post.external_id);
+  if (!pendentes.length) return [];
+
+  const avisos: string[] = [];
+
+  // Instagram: não há como editar pela API.
+  for (const post of pendentes.filter((p) => p.rede === "instagram")) {
+    await supabaseAdmin
+      .from("posts_redes")
+      .update({ vendido_erro: "O Instagram não permite editar a legenda pela API." })
+      .eq("id", post.id);
+    avisos.push('Carro vendido: edite o post dele no Instagram pelo app e escreva "VENDIDO" na legenda.');
+  }
+
+  const facebook = pendentes.filter((p) => p.rede === "facebook");
+  if (!facebook.length) return avisos;
+
+  const dados = await conexao(empresaId);
+
+  if (!dados?.access_token_enc || dados.status === "desconectado") {
+    return [...avisos, 'Carro vendido, mas o Facebook está desconectado: edite o post e escreva "VENDIDO".'];
+  }
+
+  const token = decrypt(dados.access_token_enc);
+
+  for (const post of facebook) {
+    try {
+      const atual = await graph<{ message?: string }>(`/${post.external_id}`, {
+        params: { fields: "message", access_token: token },
+      });
+      const texto = (atual.message || "").trim();
+
+      if (!texto.startsWith(MARCA_VENDIDO)) {
+        await graph(`/${post.external_id}`, {
+          method: "POST",
+          params: { message: texto ? `${MARCA_VENDIDO}\n\n${texto}` : MARCA_VENDIDO, access_token: token },
+        });
+      }
+
+      await supabaseAdmin
+        .from("posts_redes")
+        .update({ vendido_em: new Date().toISOString(), vendido_erro: null })
+        .eq("id", post.id);
+    } catch (error) {
+      const motivo = error instanceof PortalError ? error.message : "erro inesperado";
+      await supabaseAdmin.from("posts_redes").update({ vendido_erro: motivo }).eq("id", post.id);
+      avisos.push(`Não foi possível marcar VENDIDO no post do Facebook (${motivo}). Edite pelo Facebook.`);
+    }
+  }
+
+  return avisos;
+}
+
+// Posts que o painel publicou do veículo (para a tela do veículo).
+export async function postsDoVeiculo(empresaId: string, vehicleId: string) {
+  const { data } = await supabaseAdmin
+    .from("posts_redes")
+    .select("id, rede, url, created_at, vendido_em, vendido_erro")
+    .eq("empresa_id", empresaId)
+    .eq("vehicle_id", vehicleId)
+    .order("created_at", { ascending: false });
+
+  return data || [];
+}
+
 export async function postarVeiculo(
   empresaId: string,
   pedido: { vehicleId: string; legenda: string; fotos: string[]; redes: ("instagram" | "facebook")[] },
