@@ -16,6 +16,7 @@ import {
     type FipeSelection,
 } from './fipe-lookup'
 import { PortalListings } from './portal-listings'
+import { destacarCampo } from '../../lib/destacar-campo'
 import { CriarPost } from './criar-post'
 import { Eye, FileText, ImageIcon, Pencil, Star, Trash2, Upload, X } from 'lucide-react'
 
@@ -820,21 +821,25 @@ export default function VeiculosPage() {
     async function handleSaveVehicle() {
         if (!plate.trim()) {
             showToast('error', 'Campo obrigatório', 'Informe a placa do veículo.')
+            destacarCampo('placa')
             return
         }
 
         if (!brandId) {
             showToast('error', 'Campo obrigatório', 'Selecione a marca do veículo.')
+            destacarCampo('marca')
             return
         }
 
         if (!modelId) {
             showToast('error', 'Campo obrigatório', 'Selecione o modelo do veículo.')
+            destacarCampo('modelo')
             return
         }
 
         if (!colorId) {
             showToast('error', 'Campo obrigatório', 'Selecione a cor do veículo.')
+            destacarCampo('cor')
             return
         }
 
@@ -844,6 +849,7 @@ export default function VeiculosPage() {
                 'Chassi inválido',
                 'O chassi deve possuir exatamente 17 caracteres.'
             )
+            destacarCampo('chassi')
             return
         }
 
@@ -853,6 +859,7 @@ export default function VeiculosPage() {
                 'Renavam inválido',
                 'O Renavam deve possuir exatamente 11 dígitos.'
             )
+            destacarCampo('renavam')
             return
         }
 
@@ -1230,6 +1237,7 @@ export default function VeiculosPage() {
                                     <label className="text-sm font-medium text-zinc-700">Placa</label>
                                     <div className="mt-2 flex gap-2">
                                         <input
+                                            data-campo="placa"
                                             value={plate}
                                             onChange={(event) =>
                                                 setPlate(
@@ -1266,6 +1274,7 @@ export default function VeiculosPage() {
                                 <div>
                                     <label className="text-sm font-medium text-zinc-700">Marca</label>
                                     <select
+                                        data-campo="marca"
                                         value={brandId}
                                         onChange={(event) => handleBrandChange(event.target.value)}
                                         className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10"
@@ -1282,6 +1291,7 @@ export default function VeiculosPage() {
                                 <div>
                                     <label className="text-sm font-medium text-zinc-700">Modelo</label>
                                     <select
+                                        data-campo="modelo"
                                         value={modelId}
                                         onChange={(event) => setModelId(event.target.value)}
                                         disabled={!brandId}
@@ -1330,6 +1340,7 @@ export default function VeiculosPage() {
                                 <div>
                                     <label className="text-sm font-medium text-zinc-700">Cor</label>
                                     <select
+                                        data-campo="cor"
                                         value={colorId}
                                         onChange={(event) => setColorId(event.target.value)}
                                         className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10"
@@ -1449,6 +1460,7 @@ export default function VeiculosPage() {
                                 <div>
                                     <label className="text-sm font-medium text-zinc-700">Chassi</label>
                                     <input
+                                        data-campo="chassi"
                                         value={chassi}
                                         onChange={(event) => setChassi(formatChassi(event.target.value))}
                                         placeholder="9BWZZZ377VT004251"
@@ -1463,6 +1475,7 @@ export default function VeiculosPage() {
                                 <div>
                                     <label className="text-sm font-medium text-zinc-700">Renavam</label>
                                     <input
+                                        data-campo="renavam"
                                         value={renavam}
                                         onChange={(event) => setRenavam(formatRenavam(event.target.value))}
                                         placeholder="12345678901"

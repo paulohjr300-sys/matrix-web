@@ -187,3 +187,9 @@ body {
 }
 
 /*.{} */
+/* Campo obrigatório esquecido (src/lib/destacar-campo.ts). */
+.campo-erro {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 4px rgb(239 68 68 / 0.15) !important;
+  background-color: #fef2f2 !important;
+}
