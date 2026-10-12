@@ -134,16 +134,9 @@ export function PostagemMeta({
                         <p className="mt-3 leading-6">
                             Ao conectar, entre com o seu Facebook pessoal (o que administra a página) e{' '}
                             <strong>marque a página e o Instagram da loja</strong> na lista que a Meta mostrar. Se a
-                            página não aparecer, remova o app em{' '}
-                            <a
-                                href="https://www.facebook.com/settings/?tab=business_tools"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="font-semibold text-brand-600 hover:underline"
-                            >
-                                Integrações comerciais
-                            </a>{' '}
-                            e conecte de novo.
+                            página não aparecer, clique em &quot;Reconectar&quot; e, na tela da Meta, em{' '}
+                            <strong>&quot;Editar acesso&quot;</strong> (ou &quot;Editar configurações anteriores&quot;)
+                            para escolher a página de novo.
                         </p>
                     </details>
 
