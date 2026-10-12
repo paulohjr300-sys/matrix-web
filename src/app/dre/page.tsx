@@ -211,37 +211,51 @@ function DreContent() {
             0
         )
 
-        const profit = sale - investment
-        const margin = sale > 0 ? (profit / sale) * 100 : 0
+        // Sem venda lançada não há lucro ainda (o carro está no estoque): não
+        // conta como prejuízo. Mostra só o previsto pelo valor anunciado.
+        const vendido = (vehicle.vehicle_sales || []).length > 0
+        const profit = vendido ? sale - investment : null
+        const margin = vendido && sale > 0 ? ((sale - investment) / sale) * 100 : null
+        const anunciado = Number(vehicle.advertised_price || 0)
+        const previsto = !vendido && anunciado > 0 ? anunciado - investment : null
 
         return {
             purchase,
             costs,
             investment,
             sale,
+            vendido,
             profit,
             margin,
+            anunciado,
+            previsto,
         }
     }
 
-    const totals = vehicles.reduce(
+    // Totais do que está filtrado na tela. O lucro soma só os carros vendidos.
+    const totals = filteredVehicles.reduce(
         (acc, vehicle) => {
-        const numbers = getNumbers(vehicle)
+            const numbers = getNumbers(vehicle)
 
-        acc.purchase += numbers.purchase
-        acc.costs += numbers.costs
-        acc.investment += numbers.investment
-        acc.sales += numbers.sale
-        acc.profit += numbers.profit
+            acc.purchase += numbers.purchase
+            acc.costs += numbers.costs
+            acc.investment += numbers.investment
+            acc.sales += numbers.sale
 
-        return acc
-    },
+            if (numbers.profit !== null) {
+                acc.profit += numbers.profit
+                acc.vendidos += 1
+            }
+
+            return acc
+        },
         {
             purchase: 0,
             costs: 0,
             investment: 0,
             sales: 0,
             profit: 0,
+            vendidos: 0,
         }
     )
 
@@ -305,6 +319,11 @@ function DreContent() {
                                     <h2 className="mt-2 text-2xl font-bold">
                                         {formatCurrency(totals.profit)}
                                     </h2>
+                                    <p className="mt-1 text-xs text-zinc-400">
+                                        {totals.vendidos === 1
+                                            ? 'de 1 carro vendido'
+                                            : `de ${totals.vendidos} carros vendidos`}
+                                    </p>
                                 </div>
 
                                 <div
@@ -399,20 +418,42 @@ function DreContent() {
 
                                         <div>
                                             <p className="text-xs text-zinc-500">Venda</p>
-                                            <strong>{formatCurrency(numbers.sale)}</strong>
+                                            {numbers.vendido ? (
+                                                <strong>{formatCurrency(numbers.sale)}</strong>
+                                            ) : (
+                                                <>
+                                                    <strong className="text-zinc-400">Não vendido</strong>
+                                                    {numbers.anunciado > 0 && (
+                                                        <p className="text-xs text-zinc-500">
+                                                            anunciado {formatCurrency(numbers.anunciado)}
+                                                        </p>
+                                                    )}
+                                                </>
+                                            )}
                                         </div>
 
                                         <div>
                                             <p className="text-xs text-zinc-500">Lucro</p>
-                                            <strong
-                                                className={
-                                                    numbers.profit >= 0
-                                                        ? 'text-emerald-700'
-                                                        : 'text-red-700'
-                                                }
-                                            >
-                                                {formatCurrency(numbers.profit)}
-                                            </strong>
+                                            {numbers.profit !== null ? (
+                                                <strong
+                                                    className={
+                                                        numbers.profit >= 0
+                                                            ? 'text-emerald-700'
+                                                            : 'text-red-700'
+                                                    }
+                                                >
+                                                    {formatCurrency(numbers.profit)}
+                                                </strong>
+                                            ) : (
+                                                <>
+                                                    <strong className="text-zinc-400">—</strong>
+                                                    {numbers.previsto !== null && (
+                                                        <p className="text-xs text-zinc-500">
+                                                            previsto {formatCurrency(numbers.previsto)}
+                                                        </p>
+                                                    )}
+                                                </>
+                                            )}
                                         </div>
 
                                         <div className="flex justify-end">
@@ -467,7 +508,7 @@ function DreContent() {
                                                         Venda
                                                     </p>
                                                     <strong className="mt-2 block text-lg">
-                                                        {formatCurrency(numbers.sale)}
+                                                        {numbers.vendido ? formatCurrency(numbers.sale) : 'Não vendido'}
                                                     </strong>
                                                 </div>
 
@@ -476,7 +517,7 @@ function DreContent() {
                                                         Margem
                                                     </p>
                                                     <strong className="mt-2 block text-lg">
-                                                        {formatPercent(numbers.margin)}
+                                                        {numbers.margin !== null ? formatPercent(numbers.margin) : '—'}
                                                     </strong>
                                                 </div>
                                             </div>
@@ -506,34 +547,51 @@ function DreContent() {
                                                 </div>
 
                                                 <div className="grid grid-cols-2 border-b border-zinc-200 px-5 py-3 text-sm">
-                                                    <span className="text-zinc-500">Valor vendido</span>
-                                                    <strong className="text-right">
-                                                        {formatCurrency(numbers.sale)}
-                                                    </strong>
-                                                </div>
-
-                                                <div
-                                                    className={`grid grid-cols-2 rounded-b-2xl px-5 py-4 text-sm ${numbers.profit >= 0 ? 'bg-emerald-50' : 'bg-red-50'
-                                                        }`}
-                                                >
-                                                    <span
-                                                        className={`font-bold ${numbers.profit >= 0
-                                                            ? 'text-emerald-700'
-                                                            : 'text-red-700'
-                                                            }`}
-                                                    >
-                                                        Resultado final
+                                                    <span className="text-zinc-500">
+                                                        {numbers.vendido ? 'Valor vendido' : 'Valor anunciado'}
                                                     </span>
-
-                                                    <strong
-                                                        className={`text-right ${numbers.profit >= 0
-                                                            ? 'text-emerald-700'
-                                                            : 'text-red-700'
-                                                            }`}
-                                                    >
-                                                        {formatCurrency(numbers.profit)}
+                                                    <strong className="text-right">
+                                                        {formatCurrency(numbers.vendido ? numbers.sale : numbers.anunciado)}
                                                     </strong>
                                                 </div>
+
+                                                {numbers.profit !== null ? (
+                                                    <div
+                                                        className={`grid grid-cols-2 rounded-b-2xl px-5 py-4 text-sm ${numbers.profit >= 0 ? 'bg-emerald-50' : 'bg-red-50'
+                                                            }`}
+                                                    >
+                                                        <span
+                                                            className={`font-bold ${numbers.profit >= 0
+                                                                ? 'text-emerald-700'
+                                                                : 'text-red-700'
+                                                                }`}
+                                                        >
+                                                            Resultado final
+                                                        </span>
+
+                                                        <strong
+                                                            className={`text-right ${numbers.profit >= 0
+                                                                ? 'text-emerald-700'
+                                                                : 'text-red-700'
+                                                                }`}
+                                                        >
+                                                            {formatCurrency(numbers.profit)}
+                                                        </strong>
+                                                    </div>
+                                                ) : (
+                                                    <div className="grid grid-cols-2 rounded-b-2xl bg-zinc-50 px-5 py-4 text-sm">
+                                                        <span className="font-bold text-zinc-600">
+                                                            Resultado previsto
+                                                            <span className="block text-xs font-normal text-zinc-500">
+                                                                pelo valor anunciado, ainda não vendido
+                                                            </span>
+                                                        </span>
+
+                                                        <strong className="text-right text-zinc-600">
+                                                            {numbers.previsto !== null ? formatCurrency(numbers.previsto) : '—'}
+                                                        </strong>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     )}
