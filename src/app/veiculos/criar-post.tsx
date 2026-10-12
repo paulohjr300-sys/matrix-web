@@ -1,0 +1,457 @@
+'use client'
+
+import { useEffect, useMemo, useState } from 'react'
+import { Camera, Check, Copy, Download, Loader2, Share2, X } from 'lucide-react'
+import { supabase } from '../../lib/supabase'
+import { getEmpresaId, getSiteUrl } from '../../lib/tenant'
+import { hashtag, LEGENDA_PADRAO, montarLegenda, VARIAVEIS_LEGENDA } from '../../lib/legenda-post'
+
+// Post do veículo para Instagram/Facebook: monta a legenda a partir de um
+// modelo (o da loja ou o padrão) e separa as fotos. O lojista copia a
+// legenda e baixa/compartilha as fotos para postar pelo app.
+
+const MAX_FOTOS = 10
+
+type Foto = { id: string; url: string; nome: string }
+
+function telefone(valor: string | null) {
+    const d = (valor || '').replace(/\D/g, '').replace(/^55(?=\d{10,11}$)/, '')
+    if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`
+    if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`
+    return valor || ''
+}
+
+export function CriarPost({
+    vehicleId,
+    onMessage,
+}: {
+    vehicleId: string
+    onMessage: (type: 'success' | 'error', title: string, description?: string) => void
+}) {
+    const [aberto, setAberto] = useState(false)
+
+    return (
+        <>
+            <div className="mt-6 rounded-3xl border border-zinc-200 bg-white p-5">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <h3 className="text-lg font-bold text-zinc-950">Post para Instagram e Facebook</h3>
+                        <p className="text-sm text-zinc-500">Legenda pronta e fotos do veículo para postar pelo app.</p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => setAberto(true)}
+                        className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-brand-700"
+                    >
+                        <Camera size={16} /> Criar post
+                    </button>
+                </div>
+            </div>
+
+            {aberto && <JanelaPost vehicleId={vehicleId} onClose={() => setAberto(false)} onMessage={onMessage} />}
+        </>
+    )
+}
+
+function JanelaPost({
+    vehicleId,
+    onClose,
+    onMessage,
+}: {
+    vehicleId: string
+    onClose: () => void
+    onMessage: (type: 'success' | 'error', title: string, description?: string) => void
+}) {
+    const [carregando, setCarregando] = useState(true)
+    const [valores, setValores] = useState<Record<string, string>>({})
+    const [modeloLoja, setModeloLoja] = useState('')
+    const [modelo, setModelo] = useState(LEGENDA_PADRAO)
+    const [legenda, setLegenda] = useState('')
+    const [editada, setEditada] = useState(false)
+    const [editandoModelo, setEditandoModelo] = useState(false)
+    const [fotos, setFotos] = useState<Foto[]>([])
+    const [selecionadas, setSelecionadas] = useState<string[]>([])
+    const [ocupado, setOcupado] = useState<string | null>(null)
+    const [copiado, setCopiado] = useState(false)
+
+    const admin = typeof window !== 'undefined' && window.localStorage.getItem('painel_role') === 'ADMIN'
+
+    useEffect(() => {
+        async function carregar() {
+            const empresaId = await getEmpresaId()
+
+            const [{ data: veiculo }, { data: arquivos }, { data: empresa }, siteUrl] = await Promise.all([
+                supabase
+                    .from('vehicles')
+                    .select(
+                        'km, model_year, manufacture_year, advertised_price, versao, slug, is_published, main_photo_file_id, brands(name), vehicle_models(name), colors(name), fuels(name), transmissions(name)'
+                    )
+                    .eq('id', vehicleId)
+                    .single(),
+                supabase
+                    .from('vehicle_files')
+                    .select('id, file_name, file_path')
+                    .eq('vehicle_id', vehicleId)
+                    .eq('file_type', 'IMAGE')
+                    .order('created_at'),
+                supabase.from('empresas').select('nome, whatsapp, telefone, legenda_post').eq('id', empresaId).single(),
+                getSiteUrl().catch(() => ''),
+            ])
+
+            if (!veiculo) {
+                onMessage('error', 'Criar post', 'Não foi possível carregar o veículo.')
+                onClose()
+                return
+            }
+
+            const nome = (rel: unknown) => {
+                const item = Array.isArray(rel) ? rel[0] : rel
+                return (item as { name?: string } | null)?.name || ''
+            }
+
+            const marca = nome(veiculo.brands)
+            const modeloNome = nome(veiculo.vehicle_models)
+            const ano =
+                veiculo.manufacture_year && veiculo.model_year && veiculo.manufacture_year !== veiculo.model_year
+                    ? `${veiculo.manufacture_year}/${veiculo.model_year}`
+                    : String(veiculo.model_year || veiculo.manufacture_year || '')
+
+            setValores({
+                marca,
+                modelo: modeloNome,
+                versao: veiculo.versao || '',
+                ano,
+                km: veiculo.km !== null && veiculo.km !== undefined ? Number(veiculo.km).toLocaleString('pt-BR') : '',
+                preco: veiculo.advertised_price
+                    ? Number(veiculo.advertised_price).toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                        maximumFractionDigits: 0,
+                    })
+                    : '',
+                cor: nome(veiculo.colors),
+                combustivel: nome(veiculo.fuels),
+                cambio: nome(veiculo.transmissions),
+                whatsapp: telefone(empresa?.whatsapp || empresa?.telefone || null),
+                // Só com o veículo publicado: senão o link do site não abre.
+                link: siteUrl && veiculo.is_published ? `${siteUrl}/estoque/${veiculo.slug || vehicleId}` : '',
+                loja: empresa?.nome || '',
+                marca_tag: hashtag(marca),
+                modelo_tag: hashtag(modeloNome),
+            })
+
+            const daLoja = empresa?.legenda_post || ''
+            setModeloLoja(daLoja)
+            setModelo(daLoja || LEGENDA_PADRAO)
+
+            // Foto principal primeiro.
+            const lista = (arquivos || [])
+                .map((arquivo) => ({
+                    id: arquivo.id,
+                    nome: arquivo.file_name,
+                    url: supabase.storage.from('vehicle-images').getPublicUrl(arquivo.file_path).data.publicUrl,
+                }))
+                .sort((a, b) =>
+                    a.id === veiculo.main_photo_file_id ? -1 : b.id === veiculo.main_photo_file_id ? 1 : 0
+                )
+
+            setFotos(lista)
+            setSelecionadas(lista.slice(0, MAX_FOTOS).map((foto) => foto.id))
+            setCarregando(false)
+        }
+
+        void carregar()
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- carrega uma vez por veículo
+    }, [vehicleId])
+
+    const legendaGerada = useMemo(() => montarLegenda(modelo, valores), [modelo, valores])
+
+    useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- legenda acompanha o modelo até ser editada à mão
+        if (!editada) setLegenda(legendaGerada)
+    }, [legendaGerada, editada])
+
+    const fotosSelecionadas = fotos.filter((foto) => selecionadas.includes(foto.id))
+    const podeCompartilhar =
+        typeof navigator !== 'undefined' && typeof navigator.share === 'function' && typeof navigator.canShare === 'function'
+
+    function alternarFoto(id: string) {
+        setSelecionadas((atual) => {
+            if (atual.includes(id)) return atual.filter((item) => item !== id)
+            if (atual.length >= MAX_FOTOS) {
+                onMessage('error', 'Limite de fotos', `O Instagram aceita até ${MAX_FOTOS} fotos por post.`)
+                return atual
+            }
+            return [...atual, id]
+        })
+    }
+
+    async function copiar() {
+        try {
+            await navigator.clipboard.writeText(legenda)
+            setCopiado(true)
+            setTimeout(() => setCopiado(false), 2000)
+        } catch {
+            onMessage('error', 'Não foi possível copiar', 'Selecione o texto da legenda e copie manualmente.')
+        }
+    }
+
+    async function arquivosDasFotos() {
+        return Promise.all(
+            fotosSelecionadas.map(async (foto, indice) => {
+                const resposta = await fetch(foto.url)
+                if (!resposta.ok) throw new Error('Falha ao baixar a foto.')
+                const blob = await resposta.blob()
+                const extensao = (blob.type.split('/')[1] || 'jpg').replace('jpeg', 'jpg')
+                return new File([blob], `foto-${String(indice + 1).padStart(2, '0')}.${extensao}`, { type: blob.type })
+            })
+        )
+    }
+
+    async function baixar() {
+        if (!fotosSelecionadas.length) return
+        setOcupado('baixar')
+
+        try {
+            const arquivos = await arquivosDasFotos()
+
+            for (const arquivo of arquivos) {
+                const url = URL.createObjectURL(arquivo)
+                const link = document.createElement('a')
+                link.href = url
+                link.download = arquivo.name
+                document.body.appendChild(link)
+                link.click()
+                link.remove()
+                URL.revokeObjectURL(url)
+                await new Promise((resolve) => setTimeout(resolve, 300))
+            }
+
+            onMessage('success', 'Fotos baixadas', 'Se o navegador perguntar, permita baixar vários arquivos.')
+        } catch {
+            onMessage('error', 'Não foi possível baixar as fotos')
+        } finally {
+            setOcupado(null)
+        }
+    }
+
+    // No celular abre a folha de compartilhamento com as fotos (Instagram,
+    // Facebook, WhatsApp...). A legenda é copiada antes: o Instagram não
+    // aceita texto vindo do compartilhamento, é só colar.
+    async function compartilhar() {
+        if (!fotosSelecionadas.length) return
+        setOcupado('compartilhar')
+
+        try {
+            await navigator.clipboard.writeText(legenda).catch(() => undefined)
+            const arquivos = await arquivosDasFotos()
+
+            if (!navigator.canShare({ files: arquivos })) {
+                onMessage('error', 'Compartilhar', 'Este navegador não compartilha fotos. Use "Baixar fotos".')
+                return
+            }
+
+            await navigator.share({ files: arquivos, text: legenda })
+        } catch (error) {
+            if ((error as Error)?.name !== 'AbortError') {
+                onMessage('error', 'Não foi possível compartilhar', 'Use "Baixar fotos" e poste pelo app.')
+            }
+        } finally {
+            setOcupado(null)
+        }
+    }
+
+    async function salvarModelo() {
+        setOcupado('modelo')
+
+        const empresaId = await getEmpresaId()
+        const valor = modelo.trim() === LEGENDA_PADRAO.trim() ? null : modelo.trim()
+        const { error } = await supabase.from('empresas').update({ legenda_post: valor }).eq('id', empresaId)
+
+        setOcupado(null)
+
+        if (error) {
+            onMessage('error', 'Não foi possível salvar o modelo', error.message)
+            return
+        }
+
+        setModeloLoja(valor || '')
+        setEditandoModelo(false)
+        onMessage('success', 'Modelo salvo', 'Os próximos posts da loja usam este modelo.')
+    }
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-zinc-950/60 p-0 sm:items-center sm:p-4">
+            <div className="flex max-h-[95vh] w-full max-w-3xl flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl sm:rounded-3xl">
+                <div className="flex items-center justify-between border-b border-zinc-100 px-6 py-4">
+                    <h2 className="text-lg font-black text-zinc-950">Criar post</h2>
+                    <button type="button" onClick={onClose} className="rounded-xl p-2 text-zinc-500 hover:bg-zinc-100">
+                        <X size={20} />
+                    </button>
+                </div>
+
+                {carregando ? (
+                    <div className="flex items-center gap-2 p-8 text-zinc-500">
+                        <Loader2 size={18} className="animate-spin" /> Carregando...
+                    </div>
+                ) : (
+                    <div className="overflow-y-auto px-6 py-5">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <label className="text-sm font-semibold text-zinc-800">Legenda</label>
+                            <div className="flex gap-3 text-xs font-semibold">
+                                {editada && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setEditada(false)}
+                                        className="text-zinc-500 hover:underline"
+                                    >
+                                        Refazer pelo modelo
+                                    </button>
+                                )}
+                                {admin && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setEditandoModelo((atual) => !atual)}
+                                        className="text-brand-600 hover:underline"
+                                    >
+                                        {editandoModelo ? 'Fechar modelo' : 'Editar modelo da loja'}
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+
+                        {editandoModelo && (
+                            <div className="mt-2 rounded-2xl bg-zinc-50 p-4 ring-1 ring-zinc-200">
+                                <p className="text-xs text-zinc-600">
+                                    O modelo vale para todos os veículos. Use as variáveis:{' '}
+                                    {VARIAVEIS_LEGENDA.map((v) => `{${v}}`).join(' ')}. Linhas com variáveis vazias somem.
+                                </p>
+                                <textarea
+                                    value={modelo}
+                                    onChange={(event) => {
+                                        setModelo(event.target.value)
+                                        setEditada(false)
+                                    }}
+                                    rows={9}
+                                    maxLength={2200}
+                                    className="mt-2 w-full rounded-xl border border-zinc-200 bg-white p-3 font-mono text-xs outline-none focus:border-brand-500"
+                                />
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => void salvarModelo()}
+                                        disabled={ocupado === 'modelo'}
+                                        className="rounded-xl bg-brand-600 px-4 py-2 text-xs font-bold text-white hover:bg-brand-700 disabled:opacity-50"
+                                    >
+                                        Salvar como modelo da loja
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setModelo(LEGENDA_PADRAO)}
+                                        className="rounded-xl bg-white px-4 py-2 text-xs font-bold text-zinc-700 ring-1 ring-zinc-200 hover:bg-zinc-100"
+                                    >
+                                        Usar o modelo padrão
+                                    </button>
+                                    {modeloLoja && (
+                                        <span className="self-center text-xs text-zinc-500">A loja tem um modelo próprio.</span>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        <textarea
+                            value={legenda}
+                            onChange={(event) => {
+                                setLegenda(event.target.value)
+                                setEditada(true)
+                            }}
+                            rows={12}
+                            maxLength={2200}
+                            className="mt-2 w-full rounded-2xl border border-zinc-200 p-4 text-sm leading-6 outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10"
+                        />
+                        <p className="mt-1 text-right text-xs text-zinc-400">{legenda.length}/2200</p>
+
+                        <div className="mt-4">
+                            <p className="text-sm font-semibold text-zinc-800">
+                                Fotos ({fotosSelecionadas.length}/{Math.min(fotos.length, MAX_FOTOS)})
+                            </p>
+
+                            {fotos.length === 0 ? (
+                                <p className="mt-2 text-sm text-zinc-500">Este veículo não tem fotos.</p>
+                            ) : (
+                                <div className="mt-2 grid grid-cols-4 gap-2 sm:grid-cols-6">
+                                    {fotos.map((foto) => {
+                                        const marcada = selecionadas.includes(foto.id)
+                                        const posicao = selecionadas.indexOf(foto.id) + 1
+
+                                        return (
+                                            <button
+                                                key={foto.id}
+                                                type="button"
+                                                onClick={() => alternarFoto(foto.id)}
+                                                className={`relative aspect-square overflow-hidden rounded-xl ring-2 transition ${marcada ? 'ring-brand-500' : 'opacity-50 ring-transparent'}`}
+                                            >
+                                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                <img src={foto.url} alt={foto.nome} className="h-full w-full object-cover" />
+                                                {marcada && (
+                                                    <span className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-brand-600 text-[10px] font-bold text-white">
+                                                        {posicao}
+                                                    </span>
+                                                )}
+                                            </button>
+                                        )
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {!carregando && (
+                    <div className="flex flex-wrap gap-2 border-t border-zinc-100 px-6 py-4">
+                        <button
+                            type="button"
+                            onClick={() => void copiar()}
+                            className="inline-flex items-center gap-2 rounded-xl bg-zinc-950 px-4 py-2.5 text-sm font-bold text-white hover:bg-zinc-800"
+                        >
+                            {copiado ? <Check size={16} /> : <Copy size={16} />}
+                            {copiado ? 'Copiada' : 'Copiar legenda'}
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => void baixar()}
+                            disabled={!fotosSelecionadas.length || ocupado !== null}
+                            className="inline-flex items-center gap-2 rounded-xl bg-zinc-100 px-4 py-2.5 text-sm font-bold text-zinc-800 hover:bg-zinc-200 disabled:opacity-50"
+                        >
+                            {ocupado === 'baixar' ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+                            Baixar fotos
+                        </button>
+
+                        {podeCompartilhar && (
+                            <button
+                                type="button"
+                                onClick={() => void compartilhar()}
+                                disabled={!fotosSelecionadas.length || ocupado !== null}
+                                className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-brand-700 disabled:opacity-50"
+                            >
+                                {ocupado === 'compartilhar' ? (
+                                    <Loader2 size={16} className="animate-spin" />
+                                ) : (
+                                    <Share2 size={16} />
+                                )}
+                                Compartilhar
+                            </button>
+                        )}
+
+                        <p className="w-full text-xs text-zinc-500">
+                            {podeCompartilhar
+                                ? 'No celular, "Compartilhar" copia a legenda e abre o Instagram/Facebook com as fotos: é só colar a legenda.'
+                                : 'Baixe as fotos, abra o Instagram ou o Facebook, escolha as fotos e cole a legenda.'}
+                        </p>
+                    </div>
+                )}
+            </div>
+        </div>
+    )
+}

@@ -16,6 +16,7 @@ import {
     type FipeSelection,
 } from './fipe-lookup'
 import { PortalListings } from './portal-listings'
+import { CriarPost } from './criar-post'
 import { Eye, FileText, ImageIcon, Pencil, Star, Trash2, Upload, X } from 'lucide-react'
 
 type Brand = {
@@ -1817,6 +1818,8 @@ export default function VeiculosPage() {
                                     onMessage={showToast}
                                 />
                             )}
+
+                            {editingVehicleId && <CriarPost vehicleId={editingVehicleId} onMessage={showToast} />}
 
                             <div className="mt-6 flex flex-wrap gap-3">
                                 <button
