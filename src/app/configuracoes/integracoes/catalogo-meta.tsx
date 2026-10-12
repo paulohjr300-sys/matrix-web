@@ -130,8 +130,29 @@ export function CatalogoMeta({
                 )}
             </div>
 
-            <div className="mt-6">
-                <p className="text-sm font-bold text-zinc-900">Antes de começar</p>
+            <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-brand-50/60 p-4 ring-1 ring-brand-100">
+                <p className="text-sm leading-6 text-zinc-700">
+                    <strong>Atualizar agora:</strong> a Meta lê o catálogo uma vez por dia. Para atualizar na hora, abra o
+                    catálogo → <strong>Fontes de dados</strong> → clique no feed → <strong>Atualizar agora</strong> (ou
+                    &quot;Fazer upload agora&quot;).
+                </p>
+                <a
+                    href="https://business.facebook.com/commerce/"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700"
+                >
+                    <ExternalLink size={16} />
+                    Abrir Gerenciador de Comércio
+                </a>
+            </div>
+
+            <details open={!leitura?.lidoEm} className="mt-5 rounded-2xl bg-zinc-50 p-4 ring-1 ring-zinc-200">
+                <summary className="cursor-pointer text-sm font-semibold text-zinc-900">
+                    Passo a passo para criar o catálogo na Meta
+                </summary>
+
+                <p className="mt-4 text-sm font-bold text-zinc-900">Antes de começar</p>
                 <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-zinc-600">
                     <li>A loja precisa de uma <strong>Página no Facebook</strong> (e, para anunciar no Instagram, a conta do Instagram ligada a ela).</li>
                     <li>
@@ -171,7 +192,7 @@ export function CatalogoMeta({
                     Os nomes dos botões mudam de vez em quando na Meta, mas o caminho é este. Entram no catálogo os veículos
                     publicados no site com foto, marca, modelo, ano e preço.
                 </p>
-            </div>
+            </details>
         </div>
     )
 }
