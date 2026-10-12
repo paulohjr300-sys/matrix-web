@@ -9,6 +9,7 @@ import { RouteGuard } from '../../components/auth/route-guard'
 import { Toast } from '../../components/ui/toast'
 import { supabase } from '../../../lib/supabase'
 import { getEmpresaId, tenantFilePath } from '../../../lib/tenant'
+import { comCodigoDoPais } from '../../../lib/telefone'
 
 type Identidade = {
     nome: string
@@ -209,7 +210,8 @@ export default function IdentidadePage() {
                     nome: form.nome.trim(),
                     cor_primaria: form.cor_primaria.toUpperCase(),
                     cor_escura: form.cor_escura.toUpperCase(),
-                    whatsapp: form.whatsapp.replace(/\D/g, '') || null,
+                    // Com DDD e sem o 55 do Brasil: completa (WhatsApp e portais pedem o país).
+                    whatsapp: comCodigoDoPais(form.whatsapp) || null,
                 })
                 .eq('id', empresaId)
 

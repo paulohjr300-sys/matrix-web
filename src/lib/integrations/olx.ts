@@ -397,7 +397,7 @@ export function missingForOlx(vehicle: VehicleForListing, empresa: Empresa, dado
   return missing;
 }
 
-function buildAd(vehicle: VehicleForListing, empresa: Empresa, dados: OlxDados) {
+export function buildAd(vehicle: VehicleForListing, empresa: Empresa, dados: OlxDados) {
   const params: Record<string, unknown> = {
     vehicle_brand: dados.marcaId,
     vehicle_model: dados.modeloId,
@@ -661,10 +661,21 @@ export async function syncOlx(empresaId: string, vehicleId: string) {
 
   const { data: vehicle } = await supabaseAdmin.from("vehicles").select("status").eq("id", vehicleId).single();
 
-  if (vehicle?.status === "VENDIDO") return runOlx(empresaId, vehicleId, "encerrar");
-  if (anuncio.status === "pendente") return runOlx(empresaId, vehicleId, "verificar");
+  const acao = acaoSincronizacaoOlx(anuncio.status, vehicle?.status);
+  if (acao) return runOlx(empresaId, vehicleId, acao);
+}
 
-  return runOlx(empresaId, vehicleId, "atualizar");
+// O que fazer com o anúncio da OLX depois de uma mudança no veículo (sem
+// banco; testada em olx.test.ts). Vendido encerra (mesmo ainda na fila);
+// na fila confere o resultado; publicado atualiza.
+export function acaoSincronizacaoOlx(
+  anuncioStatus: string | null | undefined,
+  vehicleStatus: string | null | undefined,
+) {
+  if (!anuncioStatus || !["publicado", "pendente"].includes(anuncioStatus)) return null;
+  if (vehicleStatus === "VENDIDO") return "encerrar" as const;
+  if (anuncioStatus === "pendente") return "verificar" as const;
+  return "atualizar" as const;
 }
 
 // ---------------------------------------------------------------------

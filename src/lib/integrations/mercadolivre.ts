@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "../supabase-admin";
 import { decrypt, encrypt } from "../server-crypto";
+import { comCodigoDoPais } from "../telefone";
 import {
   getIntegracao,
   loadVehicleForListing,
@@ -326,14 +327,14 @@ export function missingForMercadoLivre(vehicle: VehicleForListing, empresa: Empr
   if ((empresa.cep || "").replace(/\D/g, "").length !== 8) {
     missing.push("CEP da loja (Configurações > Identidade do site)");
   }
-  if ((empresa.whatsapp || "").replace(/\D/g, "").length < 12) {
+  if (comCodigoDoPais(empresa.whatsapp).length < 12) {
     missing.push("WhatsApp da loja (Configurações > Identidade do site)");
   }
 
   return missing;
 }
 
-function buildAttributes(vehicle: VehicleForListing) {
+export function buildAttributes(vehicle: VehicleForListing) {
   const attributes = [
     { id: "BRAND", value_name: vehicle.brand },
     { id: "MODEL", value_name: vehicle.model },
@@ -353,8 +354,8 @@ function buildAttributes(vehicle: VehicleForListing) {
   return attributes;
 }
 
-function buildSellerContact(empresa: Empresa) {
-  const whatsapp = (empresa.whatsapp || "").replace(/\D/g, "");
+export function buildSellerContact(empresa: Empresa) {
+  const whatsapp = comCodigoDoPais(empresa.whatsapp);
   const phone = (empresa.telefone || "").replace(/\D/g, "");
 
   return {
@@ -372,7 +373,7 @@ function buildSellerContact(empresa: Empresa) {
   };
 }
 
-function buildTitle(vehicle: VehicleForListing) {
+export function buildTitle(vehicle: VehicleForListing) {
   return [vehicle.brand, vehicle.model, vehicle.versao, vehicle.model_year]
     .filter(Boolean)
     .join(" ")
@@ -677,10 +678,20 @@ export async function syncMercadoLivre(empresaId: string, vehicleId: string) {
     .eq("id", vehicleId)
     .single();
 
-  if (vehicle?.status === "VENDIDO") return runMercadoLivre(empresaId, vehicleId, "encerrar");
-  if (vehicle?.status === "RESERVADO" && anuncio.status === "publicado") {
-    return runMercadoLivre(empresaId, vehicleId, "pausar");
-  }
+  const acao = acaoSincronizacaoMercadoLivre(anuncio.status, vehicle?.status);
+  if (acao) return runMercadoLivre(empresaId, vehicleId, acao);
+}
 
-  return runMercadoLivre(empresaId, vehicleId, "atualizar");
+// O que fazer com o anúncio do ML depois de uma mudança no veículo (sem
+// banco; testada em mercadolivre.test.ts). Vendido encerra; reservado pausa;
+// o resto só atualiza preço/fotos/dados. Anúncio pausado não é reativado
+// sozinho: a pausa pode ter sido feita à mão pelo lojista.
+export function acaoSincronizacaoMercadoLivre(
+  anuncioStatus: string | null | undefined,
+  vehicleStatus: string | null | undefined,
+): Action | null {
+  if (!anuncioStatus || !["publicado", "pausado"].includes(anuncioStatus)) return null;
+  if (vehicleStatus === "VENDIDO") return "encerrar";
+  if (vehicleStatus === "RESERVADO" && anuncioStatus === "publicado") return "pausar";
+  return "atualizar";
 }

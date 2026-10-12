@@ -61,13 +61,13 @@ export function hoje() {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
 }
 
-function somarDias(data: string, dias: number) {
+export function somarDias(data: string, dias: number) {
   const d = new Date(`${data}T12:00:00Z`);
   d.setUTCDate(d.getUTCDate() + dias);
   return d.toISOString().slice(0, 10);
 }
 
-function somarMes(data: string) {
+export function somarMes(data: string) {
   const d = new Date(`${data}T12:00:00Z`);
   d.setUTCMonth(d.getUTCMonth() + 1);
   return d.toISOString().slice(0, 10);
@@ -80,7 +80,7 @@ function diasEntre(inicio: string, fim: string) {
 // Diferença proporcional ao subir de plano: para cada mensalidade paga cujo
 // mês ainda não acabou, (novo valor - valor pago) x dias restantes / dias do
 // mês.
-function diferencaProporcional(pagamentos: Pagamento[], subscriptionId: string, novoValor: number, dia: string) {
+export function diferencaProporcional(pagamentos: Pagamento[], subscriptionId: string, novoValor: number, dia: string) {
   let total = 0;
 
   for (const p of pagamentos) {
@@ -153,9 +153,14 @@ async function carregar(empresaId: string) {
 
 // Situação da assinatura para o painel: avisos e bloqueio.
 export async function situacaoDaLoja(empresaId: string) {
-  const { empresa, assinatura, pagamentos } = await carregar(empresaId);
-  const dia = hoje();
+  return calcularSituacao(await carregar(empresaId), hoje());
+}
 
+// Regras de aviso e bloqueio, sem banco (testadas em assinatura.test.ts).
+export function calcularSituacao(
+  { empresa, assinatura, pagamentos }: { empresa: Empresa; assinatura: Assinatura | null; pagamentos: Pagamento[] },
+  dia: string,
+) {
   const emAberto = pagamentos
     .filter((p) => EM_ABERTO.includes(p.status) && p.asaas_subscription_id === assinatura?.asaas_subscription_id)
     .sort((a, b) => a.vencimento.localeCompare(b.vencimento));
@@ -284,15 +289,24 @@ export async function recalcularStatus(empresaId: string) {
     .eq("empresa_id", empresaId)
     .eq("asaas_subscription_id", assinatura.asaas_subscription_id);
 
-  const lista = pagamentos ?? [];
-  let status = empresa.assinatura_status;
-
-  if (lista.some((p) => p.status === "OVERDUE")) status = "inadimplente";
-  else if (lista.some((p) => PAGOS.includes(p.status))) status = "ativa";
+  const status = statusPelasCobrancas(
+    empresa.assinatura_status,
+    (pagamentos ?? []).map((p) => p.status),
+  );
 
   if (status !== empresa.assinatura_status) {
     await supabaseAdmin.from("empresas").update({ assinatura_status: status }).eq("id", empresaId);
   }
+}
+
+// Alguma cobrança vencida: inadimplente. Sem vencidas e com alguma paga:
+// ativa. Senão (ex.: teste com a primeira fatura em aberto), não muda.
+// Cancelada só muda por nova assinatura.
+export function statusPelasCobrancas(atual: Empresa["assinatura_status"], statuses: string[]) {
+  if (atual === "cancelada") return atual;
+  if (statuses.includes("OVERDUE")) return "inadimplente" as const;
+  if (statuses.some((s) => PAGOS.includes(s))) return "ativa" as const;
+  return atual;
 }
 
 async function sincronizarCobrancas(empresaId: string, subscriptionId: string) {
@@ -519,13 +533,11 @@ async function aplicarPlanoContratado(empresaId: string, pagamento: AsaasPagamen
 
   if (!assinatura || !empresa) return;
 
-  // A cobrança da diferença leva a referência "upgrade:<loja>:<plano>".
-  const [prefixo, loja, planoRef] = (pagamento.externalReference || "").split(":");
-  const eDiferenca =
-    pagamento.id === assinatura.upgrade_pagamento_id || (prefixo === "upgrade" && loja === empresaId);
+  const decisao = decidirPlano(empresaId, pagamento, assinatura);
+  if (!decisao) return;
 
-  if (eDiferenca) {
-    const plano: PlanoId = planoRef && planoRef in PLANOS ? (planoRef as PlanoId) : "pro";
+  if (decisao.tipo === "diferenca") {
+    const plano = decisao.plano;
 
     await supabaseAdmin
       .from("assinaturas")
@@ -538,19 +550,10 @@ async function aplicarPlanoContratado(empresaId: string, pagamento: AsaasPagamen
     return;
   }
 
-  if (!assinatura.plano) return;
-
-  // Só mensalidade já com o valor do plano novo: a do mês pago antes da
-  // troca (que pode receber outro aviso, ex.: CONFIRMED e depois RECEIVED
-  // no cartão) tem o valor antigo.
-  const eMensalidade =
-    Boolean(pagamento.subscription) &&
-    pagamento.subscription === assinatura.asaas_subscription_id &&
-    Number(pagamento.value) === Number(assinatura.valor);
-  if (!eMensalidade) return;
+  const planoContratado = decisao.plano;
 
   // Mensalidade paga antes da diferença: a diferença não é mais devida.
-  if (eMensalidade && assinatura.upgrade_pagamento_id) {
+  if (assinatura.upgrade_pagamento_id) {
     await removerCobranca(assinatura.upgrade_pagamento_id).catch((error) =>
       console.error("Erro ao remover cobrança de diferença", error),
     );
@@ -564,9 +567,42 @@ async function aplicarPlanoContratado(empresaId: string, pagamento: AsaasPagamen
       .eq("empresa_id", empresaId);
   }
 
-  if (assinatura.plano !== empresa.plano) {
-    await supabaseAdmin.from("empresas").update({ plano: assinatura.plano }).eq("id", empresaId);
+  if (planoContratado !== empresa.plano) {
+    await supabaseAdmin.from("empresas").update({ plano: planoContratado }).eq("id", empresaId);
   }
+}
+
+// O que um pagamento confirmado muda no plano (sem banco; testada em
+// assinatura.test.ts):
+//   - diferença de upgrade (pelo id guardado ou pela referência
+//     "upgrade:<loja>:<plano>"): vale o plano da diferença (sem plano na
+//     referência, só pode ser o Pro);
+//   - mensalidade da assinatura atual já com o valor do plano contratado:
+//     vale o plano contratado. A mensalidade do mês pago antes da troca
+//     tem o valor antigo (e pode receber outro aviso, ex.: CONFIRMED e
+//     depois RECEIVED no cartão), então não conta;
+//   - qualquer outro pagamento: nada muda.
+export function decidirPlano(
+  empresaId: string,
+  pagamento: Pick<AsaasPagamento, "id" | "subscription" | "value" | "externalReference">,
+  assinatura: { plano: PlanoId | null; valor: number | null; asaas_subscription_id: string | null; upgrade_pagamento_id: string | null },
+): { tipo: "diferenca" | "mensalidade"; plano: PlanoId } | null {
+  const [prefixo, loja, planoRef] = (pagamento.externalReference || "").split(":");
+
+  if (pagamento.id === assinatura.upgrade_pagamento_id || (prefixo === "upgrade" && loja === empresaId)) {
+    return { tipo: "diferenca", plano: planoRef && planoRef in PLANOS ? (planoRef as PlanoId) : "pro" };
+  }
+
+  if (
+    assinatura.plano &&
+    pagamento.subscription &&
+    pagamento.subscription === assinatura.asaas_subscription_id &&
+    Number(pagamento.value) === Number(assinatura.valor)
+  ) {
+    return { tipo: "mensalidade", plano: assinatura.plano };
+  }
+
+  return null;
 }
 
 // Confere no Asaas as cobranças da loja e aplica o que o webhook não
