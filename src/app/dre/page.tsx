@@ -29,7 +29,7 @@ type VehicleDre = {
     }[]
     vehicle_sales?: {
         sale_price: number
-    }[]es
+    }[]
 }
 
 const statusOptions = [
