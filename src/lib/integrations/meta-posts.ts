@@ -203,8 +203,20 @@ export async function salvarConexaoMeta(empresaId: string, userToken: string, ex
   const paginas = await paginasDoUsuario(userToken);
 
   if (!paginas.length) {
+    // Diz quais permissões a Meta concedeu, para saber se faltou marcar a
+    // página ou se o app não tem as permissões de página.
+    const permissoes = await graph<{ data: { permission: string; status: string }[] }>("/me/permissions", {
+      params: { access_token: userToken },
+    }).catch(() => ({ data: [] }));
+
+    const concedidas = permissoes.data.filter((p) => p.status === "granted").map((p) => p.permission);
+    const faltando = ESCOPOS.filter((escopo) => !concedidas.includes(escopo));
+
     throw new PortalError(
-      "Nenhuma página do Facebook foi autorizada. Remova o app Painel em facebook.com > Configurações > Integrações comerciais, conecte de novo e marque a página da loja e o Instagram na lista da Meta.",
+      `Nenhuma página do Facebook foi autorizada. ` +
+        (faltando.length
+          ? `A Meta não concedeu: ${faltando.join(", ")}. Confira se essas permissões estão adicionadas nos casos de uso do app e conecte de novo.`
+          : "Remova o app em facebook.com > Configurações > Integrações comerciais, conecte de novo e marque a página da loja e o Instagram na lista da Meta."),
     );
   }
 
