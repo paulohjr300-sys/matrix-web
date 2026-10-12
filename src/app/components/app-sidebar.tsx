@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
@@ -114,7 +115,9 @@ export function MenuCelular() {
         <Menu size={20} />
       </button>
 
-      {aberto && (
+      {/* Portal no body: dentro do cabeçalho (que tem backdrop-blur) o
+          "fixed" ficaria preso à altura do cabeçalho e a gaveta, cortada. */}
+      {aberto && createPortal(
         <div className="fixed inset-0 z-[70] md:hidden">
           <div className="absolute inset-0 bg-zinc-950/50" onClick={() => setAberto(false)} />
           <aside className="absolute inset-y-0 left-0 w-72 max-w-[85vw] overflow-y-auto bg-brand-900 p-6 text-white shadow-2xl">
@@ -128,7 +131,8 @@ export function MenuCelular() {
             </button>
             <ConteudoMenu />
           </aside>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   )
