@@ -494,7 +494,7 @@ async function aplicarPlanoContratado(empresaId: string, pagamento: AsaasPagamen
     pagamento.id === assinatura.upgrade_pagamento_id || (prefixo === "upgrade" && loja === empresaId);
 
   if (eDiferenca) {
-    const plano: PlanoId = planoRef && planoRef in PLANOS ? (planoRef as PlanoId) : assinatura.plano || "pro";
+    const plano: PlanoId = planoRef && planoRef in PLANOS ? (planoRef as PlanoId) : "pro";
 
     await supabaseAdmin
       .from("assinaturas")
