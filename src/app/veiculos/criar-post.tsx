@@ -13,6 +13,7 @@ import { hashtag, LEGENDA_PADRAO, montarLegenda, VARIAVEIS_LEGENDA } from '../..
 const MAX_FOTOS = 10
 
 type Foto = { id: string; url: string; nome: string }
+type Rede = 'instagram' | 'facebook'
 
 function telefone(valor: string | null) {
     const d = (valor || '').replace(/\D/g, '').replace(/^55(?=\d{10,11}$)/, '')
@@ -73,6 +74,55 @@ function JanelaPost({
     const [selecionadas, setSelecionadas] = useState<string[]>([])
     const [ocupado, setOcupado] = useState<string | null>(null)
     const [copiado, setCopiado] = useState(false)
+    const [meta, setMeta] = useState<{
+        pagina: { id: string; nome: string; instagram: { id: string; username: string | null } | null }
+    } | null>(null)
+    const [redes, setRedes] = useState<Rede[]>([])
+    const [publicados, setPublicados] = useState<{ rede: Rede; url: string | null; erro?: string }[]>([])
+
+    // Postagem automática: só com o plano liberado e a página conectada.
+    useEffect(() => {
+        fetch('/api/integracoes/meta', { cache: 'no-store' })
+            .then((response) => (response.ok ? response.json() : null))
+            .then((result) => {
+                const pagina = result?.liberado && result.conexao?.status === 'conectado' ? result.conexao.pagina : null
+                if (!pagina) return
+                setMeta({ pagina })
+                setRedes(pagina.instagram ? ['instagram', 'facebook'] : ['facebook'])
+            })
+            .catch(() => undefined)
+    }, [])
+
+    function alternarRede(rede: Rede) {
+        setRedes((atual) => (atual.includes(rede) ? atual.filter((item) => item !== rede) : [...atual, rede]))
+    }
+
+    async function publicar() {
+        setOcupado('publicar')
+        setPublicados([])
+
+        try {
+            const response = await fetch('/api/integracoes/meta/postar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ vehicleId, legenda, fotoIds: selecionadas, redes }),
+            })
+            const result = await response.json().catch(() => ({}))
+
+            if (!response.ok) {
+                onMessage('error', 'Não foi possível publicar', result.message)
+                return
+            }
+
+            setPublicados(result.resultados || [])
+            const falhas = (result.resultados || []).filter((item: { erro?: string }) => item.erro).length
+
+            if (!falhas) onMessage('success', 'Post publicado')
+            else onMessage('error', 'Nem tudo foi publicado', 'Veja o motivo abaixo do botão Publicar.')
+        } finally {
+            setOcupado(null)
+        }
+    }
 
     const admin = typeof window !== 'undefined' && window.localStorage.getItem('painel_role') === 'ADMIN'
 
@@ -404,6 +454,61 @@ function JanelaPost({
                                 </div>
                             )}
                         </div>
+                    </div>
+                )}
+
+                {!carregando && meta?.pagina && (
+                    <div className="border-t border-zinc-100 bg-brand-50/50 px-6 py-4">
+                        <p className="text-sm font-semibold text-zinc-800">Publicar agora pelo painel</p>
+                        <div className="mt-2 flex flex-wrap items-center gap-4">
+                            <label className={`flex items-center gap-2 text-sm ${meta.pagina.instagram ? '' : 'opacity-50'}`}>
+                                <input
+                                    type="checkbox"
+                                    disabled={!meta.pagina.instagram}
+                                    checked={redes.includes('instagram')}
+                                    onChange={() => alternarRede('instagram')}
+                                />
+                                Instagram
+                                {meta.pagina.instagram?.username && (
+                                    <span className="text-zinc-500">@{meta.pagina.instagram.username}</span>
+                                )}
+                            </label>
+                            <label className="flex items-center gap-2 text-sm">
+                                <input
+                                    type="checkbox"
+                                    checked={redes.includes('facebook')}
+                                    onChange={() => alternarRede('facebook')}
+                                />
+                                Facebook <span className="text-zinc-500">{meta.pagina.nome}</span>
+                            </label>
+                            <button
+                                type="button"
+                                onClick={() => void publicar()}
+                                disabled={!redes.length || !fotosSelecionadas.length || ocupado !== null}
+                                className="ml-auto inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-brand-700 disabled:opacity-50"
+                            >
+                                {ocupado === 'publicar' && <Loader2 size={16} className="animate-spin" />}
+                                {ocupado === 'publicar' ? 'Publicando...' : 'Publicar'}
+                            </button>
+                        </div>
+                        {publicados.length > 0 && (
+                            <div className="mt-2 space-y-1 text-sm">
+                                {publicados.map((item) => (
+                                    <p key={item.rede} className={item.erro ? 'text-red-700' : 'text-emerald-700'}>
+                                        {item.rede === 'instagram' ? 'Instagram' : 'Facebook'}:{' '}
+                                        {item.erro ? (
+                                            item.erro
+                                        ) : item.url ? (
+                                            <a href={item.url} target="_blank" rel="noopener noreferrer" className="font-semibold underline">
+                                                publicado, ver post
+                                            </a>
+                                        ) : (
+                                            'publicado'
+                                        )}
+                                    </p>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 )}
 

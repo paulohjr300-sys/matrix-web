@@ -12,6 +12,7 @@ import { ConfirmDialog } from '../../components/ui/confirm-dialog'
 import { PacotesMercadoLivre } from './pacotes-ml'
 import { PlanoOlx } from './plano-olx'
 import { CatalogoMeta } from './catalogo-meta'
+import { PostagemMeta } from './postagem-meta'
 
 type Conexao = {
     status: 'conectado' | 'erro' | 'desconectado'
@@ -302,6 +303,8 @@ function Integracoes() {
                 )}
 
                 {!loading && catalogo && <CatalogoMeta slug={catalogo.slug} temCep={catalogo.temCep} leitura={catalogo} liberado={liberado} />}
+
+                {!loading && <PostagemMeta onMessage={showToast} />}
             </PageContainer>
         </RouteGuard>
     )
