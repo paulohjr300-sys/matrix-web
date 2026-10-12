@@ -3,6 +3,7 @@ import { requireRole } from "../../../../lib/auth-server";
 import { PortalError } from "../../../../lib/integrations/core";
 import { syncMercadoLivre } from "../../../../lib/integrations/mercadolivre";
 import { syncOlx } from "../../../../lib/integrations/olx";
+import { publicarMercadoLivreAutomatico } from "../../../../lib/integrations/automatico";
 import { marcarPostsVendidos } from "../../../../lib/integrations/meta-posts";
 
 // Publicar envolve várias chamadas ao Mercado Livre (token, CEP, anúncio,
@@ -26,6 +27,7 @@ export async function POST(request: Request) {
   }
 
   const erros: string[] = [];
+  const publicados: string[] = [];
 
   try {
     await syncMercadoLivre(auth.empresaId, vehicleId);
@@ -41,6 +43,16 @@ export async function POST(request: Request) {
     if (!(error instanceof PortalError)) console.error(error);
   }
 
+  // Acabou de entrar no site: publica no Mercado Livre (se a conta estiver
+  // conectada e o veículo ainda não tiver anúncio).
+  try {
+    const ml = await publicarMercadoLivreAutomatico(auth.empresaId, vehicleId);
+    if (ml === "publicado") publicados.push("Mercado Livre");
+    else if (ml) erros.push(ml);
+  } catch (error) {
+    console.error("Erro na publicação automática no ML", error);
+  }
+
   // Vendido: marca "VENDIDO" nos posts do carro no Facebook/Instagram.
   try {
     erros.push(...(await marcarPostsVendidos(auth.empresaId, vehicleId)));
@@ -48,5 +60,5 @@ export async function POST(request: Request) {
     console.error("Erro ao marcar VENDIDO nos posts", error);
   }
 
-  return NextResponse.json({ erros });
+  return NextResponse.json({ erros, publicados });
 }

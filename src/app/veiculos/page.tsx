@@ -784,18 +784,35 @@ export default function VeiculosPage() {
     }
 
     // Leva preço, fotos e situação do veículo para os anúncios nos portais.
+    // Veículo que entra no site também vai sozinho para o Mercado Livre e
+    // ganha post no Instagram/Facebook (se as contas estiverem conectadas).
     async function syncPortals(vehicleId: string) {
-        const response = await fetch('/api/integracoes/sincronizar', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ vehicleId }),
-        }).catch(() => null)
+        const enviar = (url: string) =>
+            fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ vehicleId }),
+            })
+                .then((response) => response.json())
+                .catch(() => null)
 
-        const result = await response?.json().catch(() => null)
+        const [portais, post] = await Promise.all([
+            enviar('/api/integracoes/sincronizar'),
+            enviar('/api/integracoes/meta/auto'),
+        ])
 
-        if (result?.erros?.length) {
-            showToast('error', 'Anúncios nos portais', result.erros.join(' '))
+        const erros: string[] = [...(portais?.erros || [])]
+        const feitos: string[] = [...(portais?.publicados || [])]
+
+        for (const item of (post?.resultados || []) as { rede: string; erro?: string }[]) {
+            const rede = item.rede === 'instagram' ? 'Instagram' : 'Facebook'
+            if (item.erro) erros.push(`${rede}: ${item.erro}`)
+            else feitos.push(`post no ${rede}`)
         }
+        if (post?.erro) erros.push(post.erro)
+
+        if (feitos.length) showToast('success', 'Publicado automaticamente', feitos.join(', ') + '.')
+        if (erros.length) showToast('error', 'Anúncios e redes sociais', erros.join(' '))
 
         setPortalsVersion((current) => current + 1)
     }
@@ -950,6 +967,9 @@ export default function VeiculosPage() {
         if (data?.id && pendingFiles.length > 0) {
             await uploadPendingFiles(data.id)
         }
+
+        // Cadastrado já publicado no site: Mercado Livre e post automáticos.
+        if (data?.id && finalIsPublished) void syncPortals(data.id)
 
         showToast(
             'success',
@@ -1143,6 +1163,8 @@ export default function VeiculosPage() {
         )
 
         await loadVehicles()
+
+        if (newValue) void syncPortals(editingVehicleId)
     }
     return (
         <>

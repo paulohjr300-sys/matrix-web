@@ -4,7 +4,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Camera, Check, Copy, Download, Loader2, Share2, X } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { getEmpresaId, getSiteUrl } from '../../lib/tenant'
-import { hashtag, LEGENDA_PADRAO, montarLegenda, VARIAVEIS_LEGENDA } from '../../lib/legenda-post'
+import {
+    LEGENDA_PADRAO,
+    montarLegenda,
+    valoresDaLegenda,
+    VARIAVEIS_LEGENDA,
+    VEICULO_LEGENDA_SELECT,
+    type VeiculoLegenda,
+} from '../../lib/legenda-post'
 
 // Post do veículo para Instagram/Facebook: monta a legenda a partir de um
 // modelo (o da loja ou o padrão) e separa as fotos. O lojista copia a
@@ -15,12 +22,6 @@ const MAX_FOTOS = 10
 type Foto = { id: string; url: string; nome: string }
 type Rede = 'instagram' | 'facebook'
 
-function telefone(valor: string | null) {
-    const d = (valor || '').replace(/\D/g, '').replace(/^55(?=\d{10,11}$)/, '')
-    if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`
-    if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`
-    return valor || ''
-}
 
 export function CriarPost({
     vehicleId,
@@ -221,9 +222,7 @@ function JanelaPost({
             const [{ data: veiculo }, { data: arquivos }, { data: empresa }, siteUrl] = await Promise.all([
                 supabase
                     .from('vehicles')
-                    .select(
-                        'km, model_year, manufacture_year, advertised_price, versao, slug, is_published, main_photo_file_id, brands(name), vehicle_models(name), colors(name), fuels(name), transmissions(name)'
-                    )
+                    .select(VEICULO_LEGENDA_SELECT)
                     .eq('id', vehicleId)
                     .single(),
                 supabase
@@ -242,41 +241,7 @@ function JanelaPost({
                 return
             }
 
-            const nome = (rel: unknown) => {
-                const item = Array.isArray(rel) ? rel[0] : rel
-                return (item as { name?: string } | null)?.name || ''
-            }
-
-            const marca = nome(veiculo.brands)
-            const modeloNome = nome(veiculo.vehicle_models)
-            const ano =
-                veiculo.manufacture_year && veiculo.model_year && veiculo.manufacture_year !== veiculo.model_year
-                    ? `${veiculo.manufacture_year}/${veiculo.model_year}`
-                    : String(veiculo.model_year || veiculo.manufacture_year || '')
-
-            setValores({
-                marca,
-                modelo: modeloNome,
-                versao: veiculo.versao || '',
-                ano,
-                km: veiculo.km !== null && veiculo.km !== undefined ? Number(veiculo.km).toLocaleString('pt-BR') : '',
-                preco: veiculo.advertised_price
-                    ? Number(veiculo.advertised_price).toLocaleString('pt-BR', {
-                        style: 'currency',
-                        currency: 'BRL',
-                        maximumFractionDigits: 0,
-                    })
-                    : '',
-                cor: nome(veiculo.colors),
-                combustivel: nome(veiculo.fuels),
-                cambio: nome(veiculo.transmissions),
-                whatsapp: telefone(empresa?.whatsapp || empresa?.telefone || null),
-                // Só com o veículo publicado: senão o link do site não abre.
-                link: siteUrl && veiculo.is_published ? `${siteUrl}/estoque/${veiculo.slug || vehicleId}` : '',
-                loja: empresa?.nome || '',
-                marca_tag: hashtag(marca),
-                modelo_tag: hashtag(modeloNome),
-            })
+            setValores(valoresDaLegenda(veiculo as VeiculoLegenda, vehicleId, empresa, siteUrl))
 
             const daLoja = empresa?.legenda_post || ''
             setModeloLoja(daLoja)
