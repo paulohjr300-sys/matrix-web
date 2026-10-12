@@ -19,13 +19,13 @@ export function PageContainer({
         <div className="flex bg-zinc-100">
             <AppSidebar />
 
-            <div className="min-h-screen flex-1">
+            <div className="min-h-screen min-w-0 flex-1">
                 <AppHeader title={title} description={description} />
                 <AssinaturaAviso />
 
-                <main className="p-8">
+                <main className="p-4 md:p-8">
                     {action && (
-                        <div className="mb-8 flex justify-end">
+                        <div className="mb-4 flex justify-end md:mb-8">
                             {action}
                         </div>
                     )}

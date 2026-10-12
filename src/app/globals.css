@@ -187,6 +187,22 @@ body {
 }
 
 /*.{} */
+/* Celular: tabelas largas rolam de lado dentro do cartão em vez de
+   estourar a tela. Não afeta tablet, notebook e desktop. */
+@media (max-width: 767px) {
+  main table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  main th,
+  main td {
+    white-space: nowrap;
+  }
+}
+
 /* Campo obrigatório esquecido (src/lib/destacar-campo.ts). */
 .campo-erro {
   border-color: #ef4444 !important;

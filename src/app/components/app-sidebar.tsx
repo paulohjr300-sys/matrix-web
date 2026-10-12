@@ -14,6 +14,8 @@ import {
   Calculator,
   LogOut,
   ExternalLink,
+  Menu,
+  X,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { PainelLogo } from './brand/painel-logo'
@@ -72,7 +74,67 @@ const menus = [
   },
 ]
 
+// Menu lateral fixo (tablet, notebook e desktop). No celular ele fica
+// escondido e abre como gaveta pelo botão do cabeçalho (MenuCelular).
 export function AppSidebar() {
+  return (
+    <aside className="hidden min-h-screen w-64 bg-brand-900 p-6 text-white md:block">
+      <ConteudoMenu />
+    </aside>
+  )
+}
+
+// Botão ☰ (só no celular) que abre o mesmo menu como gaveta.
+export function MenuCelular() {
+  const [aberto, setAberto] = useState(false)
+  const pathname = usePathname()
+
+  // Trocou de página: fecha a gaveta.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fecha ao navegar
+    setAberto(false)
+  }, [pathname])
+
+  // Gaveta aberta: a página de trás não rola.
+  useEffect(() => {
+    document.body.style.overflow = aberto ? 'hidden' : ''
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [aberto])
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setAberto(true)}
+        aria-label="Abrir menu"
+        className="shrink-0 rounded-xl border border-zinc-200 bg-white p-2.5 text-zinc-800 shadow-sm md:hidden"
+      >
+        <Menu size={20} />
+      </button>
+
+      {aberto && (
+        <div className="fixed inset-0 z-[70] md:hidden">
+          <div className="absolute inset-0 bg-zinc-950/50" onClick={() => setAberto(false)} />
+          <aside className="absolute inset-y-0 left-0 w-72 max-w-[85vw] overflow-y-auto bg-brand-900 p-6 text-white shadow-2xl">
+            <button
+              type="button"
+              onClick={() => setAberto(false)}
+              aria-label="Fechar menu"
+              className="absolute right-4 top-4 rounded-xl p-2 text-brand-100 hover:bg-white/10"
+            >
+              <X size={20} />
+            </button>
+            <ConteudoMenu />
+          </aside>
+        </div>
+      )}
+    </>
+  )
+}
+
+function ConteudoMenu() {
   const pathname = usePathname()
   const router = useRouter()
   const [role, setRole] = useState<Role | null>(() => {
@@ -123,7 +185,7 @@ export function AppSidebar() {
   )
 
   return (
-    <aside className="hidden min-h-screen w-64 bg-brand-900 p-6 text-white md:block">
+    <>
       <div className="mb-10">
         <h1>
           <PainelLogo variant="dark" />
@@ -178,6 +240,6 @@ export function AppSidebar() {
         <LogOut size={20} />
         Sair
       </button>
-    </aside>
+    </>
   )
 }

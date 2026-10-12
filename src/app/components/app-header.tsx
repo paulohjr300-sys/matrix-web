@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { Bell, Car, ImageIcon, User, UserRound } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../../lib/supabase'
+import { MenuCelular } from './app-sidebar'
 
 interface AppHeaderProps {
     title: string
@@ -191,24 +192,28 @@ export function AppHeader({ title, description }: AppHeaderProps) {
     }
 
     return (
-        <header className="sticky top-0 z-20 border-b border-zinc-200 bg-zinc-100/80 px-8 py-5 backdrop-blur">
-            <div className="flex items-center justify-between gap-6">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-zinc-950">
-                        {title}
-                    </h1>
+        <header className="sticky top-0 z-20 border-b border-zinc-200 bg-zinc-100/80 px-4 py-3 backdrop-blur md:px-8 md:py-5">
+            <div className="flex items-center justify-between gap-3 md:gap-6">
+                <div className="flex min-w-0 items-center gap-3">
+                    <MenuCelular />
 
-                    {description && (
-                        <p className="mt-1 text-sm text-zinc-500">{description}</p>
-                    )}
+                    <div className="min-w-0">
+                        <h1 className="truncate text-xl font-bold tracking-tight text-zinc-950 md:text-3xl">
+                            {title}
+                        </h1>
+
+                        {description && (
+                            <p className="mt-1 hidden text-sm text-zinc-500 sm:block">{description}</p>
+                        )}
+                    </div>
                 </div>
 
-                <div className="flex items-center gap-4">
+                <div className="flex shrink-0 items-center gap-2 md:gap-4">
                     <div className="relative">
                         <button
                             type="button"
                             onClick={() => setDropdownOpen((current) => !current)}
-                            className={`relative rounded-2xl border p-3 shadow-sm transition-all duration-300 hover:-translate-y-0.5 ${bellAttention
+                            className={`relative rounded-2xl border p-2.5 shadow-sm md:p-3 transition-all duration-300 hover:-translate-y-0.5 ${bellAttention
                                     ? 'border-brand-200 bg-brand-50 text-brand-600 ring-4 ring-brand-500/20'
                                     : 'border-zinc-200 bg-white hover:bg-zinc-50'
                                 }`} 
@@ -226,7 +231,7 @@ export function AppHeader({ title, description }: AppHeaderProps) {
                         </button>
 
                         {dropdownOpen && (
-                            <div className="absolute right-0 top-14 z-[9999] w-96 overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-2xl shadow-zinc-300/70">
+                            <div className="fixed left-4 right-4 top-16 z-[9999] overflow-hidden rounded-3xl md:absolute md:left-auto md:right-0 md:top-14 md:w-96 border border-zinc-200 bg-white shadow-2xl shadow-zinc-300/70">
                                 <div className="border-b border-zinc-200 p-5">
                                     <h3 className="text-lg font-black text-zinc-950">
                                         Notificações
@@ -285,7 +290,7 @@ export function AppHeader({ title, description }: AppHeaderProps) {
                         )}
                     </div>
 
-                    <div className="flex items-center gap-3 rounded-2xl border border-zinc-200 bg-white px-4 py-2 shadow-sm">
+                    <div className="hidden items-center gap-3 rounded-2xl border border-zinc-200 bg-white px-4 py-2 shadow-sm sm:flex">
                         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-zinc-950 text-white">
                             <User size={18} />
                         </div>

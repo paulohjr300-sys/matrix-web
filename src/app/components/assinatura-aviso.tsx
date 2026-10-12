@@ -95,7 +95,7 @@ export function AssinaturaAviso() {
     if (!aviso || pathname === PAGINA_ASSINATURA) return null
 
     return (
-        <div className="flex flex-wrap items-center justify-between gap-3 bg-amber-50 px-8 py-3 text-sm text-amber-900 ring-1 ring-amber-200">
+        <div className="flex flex-wrap items-center justify-between gap-3 bg-amber-50 px-4 py-3 text-sm md:px-8 text-amber-900 ring-1 ring-amber-200">
             <span className="flex items-center gap-2 font-semibold">
                 <AlertTriangle size={16} /> {aviso}
             </span>

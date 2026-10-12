@@ -358,7 +358,7 @@ export default function CrmPage() {
                             if (over) void moverPara(String(active.id), over.id as Etapa)
                         }}
                     >
-                    <div className="-mx-8 mt-6 overflow-x-auto px-8 pb-4 xl:mx-0 xl:overflow-visible xl:px-0">
+                    <div className="-mx-4 mt-6 overflow-x-auto px-4 pb-4 md:-mx-8 md:px-8 xl:mx-0 xl:overflow-visible xl:px-0">
                         <div className="flex min-w-max gap-4 xl:grid xl:min-w-0 xl:grid-cols-6 xl:gap-3">
                             {/* Telas grandes: 6 colunas dividindo a largura, sem rolagem lateral. Menores: rolagem lateral. */}
                             {ETAPAS.map((etapa) => {
