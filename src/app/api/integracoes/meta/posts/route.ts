@@ -8,7 +8,24 @@ export async function GET(request: Request) {
   const auth = await requireRole(["ADMIN", "GERENTE", "VENDEDOR"]);
   if (!auth.ok) return auth.response;
 
-  const vehicleId = new URL(request.url).searchParams.get("vehicleId") || "";
+  const params = new URL(request.url).searchParams;
+
+  // ?pendentes=1: posts de carros vendidos que a loja precisa editar pelo
+  // app (Instagram), para a tela de Vendas.
+  if (params.has("pendentes")) {
+    const { data } = await supabaseAdmin
+      .from("posts_redes")
+      .select("id, rede, url, created_at, vehicle_id, vendido_erro")
+      .eq("empresa_id", auth.empresaId)
+      .not("vendido_erro", "is", null)
+      .is("vendido_em", null)
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    return NextResponse.json({ posts: data || [] });
+  }
+
+  const vehicleId = params.get("vehicleId") || "";
   if (!vehicleId) return NextResponse.json({ message: "Veículo inválido." }, { status: 400 });
 
   return NextResponse.json({ posts: await postsDoVeiculo(auth.empresaId, vehicleId) });

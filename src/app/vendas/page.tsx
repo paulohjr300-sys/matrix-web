@@ -7,14 +7,25 @@ import { Toast } from '../components/ui/toast'
 import { ConfirmDialog } from '../components/ui/confirm-dialog'
 import { supabase } from '../../lib/supabase'
 import { sincronizarAnuncios } from '../../lib/portal-sync'
-import { Pencil, Trash2 } from 'lucide-react'
+import { Check, Copy, ExternalLink, Pencil, Trash2 } from 'lucide-react'
 
 type Vehicle = {
     id: string
     plate: string
+    advertised_price?: number | null
+    purchase_price?: number | null
     brands?: { name: string } | null
     vehicle_models?: { name: string } | null
 }
+
+type PostPendente = {
+    id: string
+    rede: 'instagram' | 'facebook'
+    url: string | null
+    vehicle_id: string | null
+}
+
+const MARCA_VENDIDO = '✅ VENDIDO'
 
 type Sale = {
     id: string
@@ -67,6 +78,9 @@ export default function VendasPage() {
 
     const [loading, setLoading] = useState(false)
     const [deleteSaleId, setDeleteSaleId] = useState<string | null>(null)
+    const [custos, setCustos] = useState<number | null>(null)
+    const [postsPendentes, setPostsPendentes] = useState<PostPendente[]>([])
+    const [copiado, setCopiado] = useState(false)
 
     const [toast, setToast] = useState({
         open: false,
@@ -99,6 +113,60 @@ export default function VendasPage() {
         setSalePrice('')
         setPaymentMethod('')
         setNotes('')
+        setCustos(null)
+    }
+
+    // Custos lançados no veículo (para o lucro estimado da venda).
+    async function loadCustos(id: string) {
+        setCustos(null)
+        if (!id) return
+
+        const { data } = await supabase.from('vehicle_costs').select('amount').eq('vehicle_id', id)
+        setCustos((data || []).reduce((total, item) => total + Number(item.amount || 0), 0))
+    }
+
+    // Escolheu o veículo: o valor da venda já vem com o valor anunciado.
+    function selecionarVeiculo(id: string) {
+        setVehicleId(id)
+        void loadCustos(id)
+
+        const vehicle = vehicles.find((item) => item.id === id)
+        if (!editingSaleId && vehicle?.advertised_price) {
+            setSalePrice(formatCurrency(Number(vehicle.advertised_price)))
+        }
+    }
+
+    // Posts do Instagram de carros vendidos: a Meta não deixa o painel editar,
+    // a loja edita pelo app.
+    async function loadPostsPendentes() {
+        const response = await fetch('/api/integracoes/meta/posts?pendentes=1', { cache: 'no-store' }).catch(() => null)
+        const result = await response?.json().catch(() => null)
+        setPostsPendentes(result?.posts || [])
+    }
+
+    async function marcarPostEditado(id: string) {
+        const response = await fetch('/api/integracoes/meta/posts', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id }),
+        })
+
+        if (!response.ok) {
+            showToast('error', 'Erro', 'Não foi possível atualizar o post.')
+            return
+        }
+
+        await loadPostsPendentes()
+    }
+
+    async function copiarVendido() {
+        try {
+            await navigator.clipboard.writeText(MARCA_VENDIDO)
+            setCopiado(true)
+            setTimeout(() => setCopiado(false), 2000)
+        } catch {
+            // Sem acesso à área de transferência: o texto está na tela.
+        }
     }
 
     async function loadVehicles() {
@@ -107,6 +175,8 @@ export default function VendasPage() {
             .select(`
         id,
         plate,
+        advertised_price,
+        purchase_price,
         brands(name),
         vehicle_models(name)
       `)
@@ -124,6 +194,8 @@ export default function VendasPage() {
         vehicles(
           id,
           plate,
+          advertised_price,
+          purchase_price,
           brands(name),
           vehicle_models(name)
         )
@@ -137,6 +209,7 @@ export default function VendasPage() {
         async function loadInitialData() {
             await loadVehicles()
             await loadSales()
+            await loadPostsPendentes()
         }
 
         void loadInitialData()
@@ -149,6 +222,7 @@ export default function VendasPage() {
         setSalePrice(formatCurrency(Number(sale.sale_price)))
         setPaymentMethod(sale.payment_method || '')
         setNotes(sale.notes || '')
+        void loadCustos(sale.vehicle_id)
         setShowForm(true)
         window.scrollTo({ top: 0, behavior: 'smooth' })
     }
@@ -169,9 +243,11 @@ export default function VendasPage() {
             })
             .eq('id', id)
 
-        // Vendido: encerra os anúncios nos portais.
+        // Vendido: encerra os anúncios nos portais e marca "VENDIDO" nos posts.
         void sincronizarAnuncios(id).then((erros) => {
-            if (erros.length) showToast('error', 'Anúncios nos portais', erros.join(' '))
+            const avisos = erros.filter((erro) => !erro.includes('Instagram'))
+            if (avisos.length) showToast('error', 'Anúncios nos portais', avisos.join(' '))
+            void loadPostsPendentes()
         })
     }
 
@@ -192,6 +268,7 @@ export default function VendasPage() {
             vehicle_id: vehicleId,
             sale_date: saleDate || new Date().toISOString().slice(0, 10),
             sale_price: parseCurrency(salePrice),
+            advertised_price: vehicleOptions.find((vehicle) => vehicle.id === vehicleId)?.advertised_price ?? null,
             payment_method: paymentMethod,
             notes,
         }
@@ -268,6 +345,19 @@ export default function VendasPage() {
         loadVehicles()
     }
 
+    const selectedVehicle = vehicleOptions.find((vehicle) => vehicle.id === vehicleId) || null
+    const lucroEstimado =
+        selectedVehicle?.purchase_price && salePrice
+            ? parseCurrency(salePrice) - Number(selectedVehicle.purchase_price) - (custos || 0)
+            : null
+
+    const veiculoDoPost = (id: string | null) =>
+        getVehicleLabel(
+            sales.find((sale) => sale.vehicle_id === id)?.vehicles ||
+            vehicles.find((vehicle) => vehicle.id === id) ||
+            null
+        )
+
     return (
         <>
             <PageContainer
@@ -285,6 +375,58 @@ export default function VendasPage() {
                     </button>
                 }
             >
+                {postsPendentes.length > 0 && (
+                    <div className="mb-8 rounded-3xl bg-amber-50 p-5 ring-1 ring-amber-200">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                                <h2 className="font-bold text-amber-900">Posts do Instagram para marcar VENDIDO</h2>
+                                <p className="text-sm text-amber-800">
+                                    O Instagram não deixa o painel editar o post. Abra pelo app, toque em ⋯ → Editar e
+                                    coloque &quot;{MARCA_VENDIDO}&quot; no começo da legenda.
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => void copiarVendido()}
+                                className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-semibold text-amber-900 ring-1 ring-amber-300 hover:bg-amber-100"
+                            >
+                                {copiado ? <Check size={16} /> : <Copy size={16} />}
+                                {copiado ? 'Copiado' : `Copiar "${MARCA_VENDIDO}"`}
+                            </button>
+                        </div>
+
+                        <div className="mt-4 space-y-2">
+                            {postsPendentes.map((post) => (
+                                <div
+                                    key={post.id}
+                                    className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white px-4 py-3 text-sm"
+                                >
+                                    <span className="font-semibold text-zinc-800">{veiculoDoPost(post.vehicle_id)}</span>
+                                    <span className="flex items-center gap-4">
+                                        {post.url && (
+                                            <a
+                                                href={post.url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="inline-flex items-center gap-1 font-semibold text-brand-600 hover:underline"
+                                            >
+                                                Abrir post <ExternalLink size={14} />
+                                            </a>
+                                        )}
+                                        <button
+                                            type="button"
+                                            onClick={() => void marcarPostEditado(post.id)}
+                                            className="font-semibold text-zinc-700 hover:underline"
+                                        >
+                                            Já editei
+                                        </button>
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
                 {showForm && (
                     <div className="mb-8 rounded-3xl border bg-white p-6 shadow">
                         <div className="grid gap-5 md:grid-cols-2">
@@ -293,7 +435,7 @@ export default function VendasPage() {
 
                                 <select
                                     value={vehicleId}
-                                    onChange={(e) => setVehicleId(e.target.value)}
+                                    onChange={(e) => selecionarVeiculo(e.target.value)}
                                     className="mt-2 w-full rounded-xl border px-4 py-3"
                                 >
                                     <option value="">Selecione</option>
@@ -316,6 +458,33 @@ export default function VendasPage() {
                                     className="mt-2 w-full rounded-xl border px-4 py-3"
                                 />
                             </div>
+
+                            {selectedVehicle && (
+                                <div className="grid grid-cols-2 gap-3 rounded-2xl bg-zinc-50 p-4 text-sm ring-1 ring-zinc-200 md:col-span-2 md:grid-cols-4">
+                                    <div>
+                                        <p className="text-xs text-zinc-500">Valor anunciado</p>
+                                        <p className="font-bold text-zinc-900">
+                                            {selectedVehicle.advertised_price ? formatCurrency(Number(selectedVehicle.advertised_price)) : '-'}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-zinc-500">Valor de compra</p>
+                                        <p className="font-bold text-zinc-900">
+                                            {selectedVehicle.purchase_price ? formatCurrency(Number(selectedVehicle.purchase_price)) : '-'}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-zinc-500">Custos lançados</p>
+                                        <p className="font-bold text-zinc-900">{custos === null ? '...' : formatCurrency(custos)}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-zinc-500">Lucro estimado</p>
+                                        <p className={`font-bold ${lucroEstimado !== null && lucroEstimado < 0 ? 'text-red-600' : 'text-emerald-700'}`}>
+                                            {lucroEstimado === null ? '-' : formatCurrency(lucroEstimado)}
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
 
                             <div>
                                 <label>Valor da venda</label>
