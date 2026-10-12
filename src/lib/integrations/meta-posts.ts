@@ -56,11 +56,20 @@ export function metaAuthorizationUrl(state: string) {
     client_id: process.env.META_APP_ID!,
     redirect_uri: process.env.META_REDIRECT_URI!,
     state,
-    scope: ESCOPOS.join(","),
     response_type: "code",
     // Pede de novo o que foi recusado antes (ex.: página desmarcada).
     auth_type: "rerequest",
   });
+
+  // Login do Facebook para Empresas: as permissões e os ativos (páginas,
+  // Instagram) vêm da configuração criada no app (META_CONFIG_ID), não da
+  // lista de escopos.
+  if (process.env.META_CONFIG_ID) {
+    params.set("config_id", process.env.META_CONFIG_ID);
+    params.set("override_default_response_type", "true");
+  } else {
+    params.set("scope", ESCOPOS.join(","));
+  }
 
   return `https://www.facebook.com/${VERSAO}/dialog/oauth?${params}`;
 }
