@@ -172,7 +172,6 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
   const descricaoDe = (item: (typeof comFotos)[number]) =>
     cleanDescription(
       item.v.description ||
-        item.v.notes ||
         `${item.titulo}. Veículo disponível na ${empresa.nome}. Entre em contato para mais informações.`,
     );
 
@@ -267,7 +266,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
 
       const titulo = [v.brand_name, v.model_name, v.versao, v.model_year].filter(Boolean).join(" ");
       const descricao = cleanDescription(
-        v.description || v.notes || `${titulo}. Veículo disponível na ${empresa.nome}. Entre em contato para mais informações.`,
+        v.description || `${titulo}. Veículo disponível na ${empresa.nome}. Entre em contato para mais informações.`,
       );
       const km = Math.max(0, Math.round(Number(v.km || 0)));
 

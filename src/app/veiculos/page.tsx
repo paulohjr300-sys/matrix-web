@@ -473,7 +473,7 @@ export default function VeiculosPage() {
 
     function handleAddPendingFile(file: File, fileType: 'IMAGE' | 'PDF') {
         if (fileType === 'PDF' && file.size > 10 * 1024 * 1024) {
-            showToast('error', 'Arquivo muito grande', 'O PDF deve ter no máximo 10MB.')
+            showToast('error', 'Arquivo muito grande', 'O documento deve ter no máximo 10MB.')
             return
         }
 
@@ -1570,12 +1570,13 @@ export default function VeiculosPage() {
 
                                 <div className="md:col-span-3">
                                     <label className="text-sm font-medium text-zinc-700">
-                                        Observações
+                                        Observações internas{' '}
+                                        <span className="font-normal text-zinc-500">(só a equipe vê; não vão para o site nem para os portais)</span>
                                     </label>
                                     <textarea
                                         value={notes}
                                         onChange={(event) => setNotes(event.target.value)}
-                                        placeholder="Ex: veículo revisado, manual e chave reserva, IPVA pago..."
+                                        placeholder="Ex: comprado de particular, falta transferir, chave reserva no cofre..."
                                         rows={4}
                                         className="mt-2 w-full resize-none rounded-xl border border-zinc-200 px-4 py-3 outline-none transition-all focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10"
                                     />
@@ -1589,7 +1590,7 @@ export default function VeiculosPage() {
                                             Fotos e documentos
                                         </h3>
                                         <p className="mt-1 text-sm text-zinc-500">
-                                            Anexe várias fotos e PDFs de uma vez. As fotos ficam separadas dos documentos.
+                                            Fotos do anúncio são públicas (vão para o site). Documentos (CRLV, nota, contrato, inclusive foto deles) vão em &quot;Enviar documentos&quot;: ficam privados, só a equipe da loja abre.
                                         </p>
                                     </div>
                                 </div>
@@ -1617,10 +1618,10 @@ export default function VeiculosPage() {
 
                                     <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-zinc-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-zinc-800">
                                         <Upload size={18} />
-                                        Enviar PDFs
+                                        Enviar documentos
                                         <input
                                             type="file"
-                                            accept="application/pdf"
+                                            accept="application/pdf,image/*"
                                             multiple
                                             className="hidden"
                                             disabled={uploading}
@@ -1818,7 +1819,7 @@ export default function VeiculosPage() {
                                                             {file.file_name}
                                                         </p>
                                                         <p className="text-xs text-zinc-500">
-                                                            PDF · {formatFileSize(file.file_size)}
+                                                            {file.mime_type?.startsWith('image/') ? 'Imagem' : 'PDF'} · {formatFileSize(file.file_size)}
                                                         </p>
                                                     </div>
                                                 </div>
