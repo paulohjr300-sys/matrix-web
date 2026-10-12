@@ -20,6 +20,7 @@ export type AsaasPagamento = {
   paymentDate?: string | null;
   clientPaymentDate?: string | null;
   invoiceUrl?: string | null;
+  externalReference?: string | null;
   deleted?: boolean;
 };
 
@@ -158,6 +159,18 @@ export function criarCobranca(dados: {
       externalReference: dados.referencia,
     },
   });
+}
+
+export function buscarCobranca(id: string) {
+  return asaas<AsaasPagamento>(`/payments/${encodeURIComponent(id)}`);
+}
+
+export async function listarCobrancasPorReferencia(referencia: string) {
+  const data = await asaas<{ data: AsaasPagamento[] }>(
+    `/payments?externalReference=${encodeURIComponent(referencia)}&limit=20`,
+  );
+
+  return data.data || [];
 }
 
 export function removerCobranca(id: string) {

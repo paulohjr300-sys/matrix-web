@@ -1,18 +1,24 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "../../../lib/auth-server";
 import { asaasConfigurado, AsaasError } from "../../../lib/billing/asaas";
-import { assinar, atualizarSuspensao, FORMAS_PAGAMENTO, situacaoDaLoja, type FormaPagamento } from "../../../lib/billing/assinatura";
+import { assinar, atualizarSuspensao, conferirNoAsaas, FORMAS_PAGAMENTO, situacaoDaLoja, type FormaPagamento } from "../../../lib/billing/assinatura";
 import { PLANOS, type PlanoId } from "../../../lib/planos";
 
 export const maxDuration = 30;
 
 // Situação da assinatura da loja (avisos e bloqueio do painel). O
 // histórico de cobranças só vai para o administrador da loja.
-export async function GET() {
+export async function GET(request: Request) {
   const auth = await requireRole(["ADMIN", "GERENTE", "VENDEDOR"]);
   if (!auth.ok) return auth.response;
 
   try {
+    // Administrador na tela de Assinatura: confere no Asaas o que o webhook
+    // possa não ter aplicado.
+    if (auth.role === "ADMIN" && asaasConfigurado() && new URL(request.url).searchParams.has("conferir")) {
+      await conferirNoAsaas(auth.empresaId).catch((error) => console.error("Erro ao conferir no Asaas", error));
+    }
+
     // Aproveita a consulta para manter o site da loja em dia com o bloqueio.
     await atualizarSuspensao(auth.empresaId).catch((error) => console.error(error));
     const situacao = await situacaoDaLoja(auth.empresaId);

@@ -8,6 +8,8 @@ import {
   criarCliente,
   criarCobranca,
   removerCobranca,
+  buscarCobranca,
+  listarCobrancasPorReferencia,
   type AsaasAssinatura,
   type AsaasPagamento,
 } from "./asaas";
@@ -360,7 +362,7 @@ export async function assinar(
             formaPagamento: pedido.formaPagamento,
             vencimento: dia,
             descricao: `painel - diferença para o plano ${PLANOS[pedido.plano].nome} até o fim do mês já pago`,
-            referencia: `upgrade:${empresaId}`,
+            referencia: `upgrade:${empresaId}:${pedido.plano}`,
           });
 
           await salvarPagamento(empresaId, cobranca);
@@ -484,9 +486,29 @@ async function aplicarPlanoContratado(empresaId: string, pagamento: AsaasPagamen
     supabaseAdmin.from("empresas").select("plano").eq("id", empresaId).single(),
   ]);
 
-  if (!assinatura?.plano || !empresa) return;
+  if (!assinatura || !empresa) return;
 
-  const eDiferenca = pagamento.id === assinatura.upgrade_pagamento_id;
+  // A cobrança da diferença leva a referência "upgrade:<loja>:<plano>".
+  const [prefixo, loja, planoRef] = (pagamento.externalReference || "").split(":");
+  const eDiferenca =
+    pagamento.id === assinatura.upgrade_pagamento_id || (prefixo === "upgrade" && loja === empresaId);
+
+  if (eDiferenca) {
+    const plano: PlanoId = planoRef && planoRef in PLANOS ? (planoRef as PlanoId) : assinatura.plano || "pro";
+
+    await supabaseAdmin
+      .from("assinaturas")
+      .update({ plano, upgrade_pagamento_id: null, updated_at: new Date().toISOString() })
+      .eq("empresa_id", empresaId);
+
+    if (plano !== empresa.plano) {
+      await supabaseAdmin.from("empresas").update({ plano }).eq("id", empresaId);
+    }
+    return;
+  }
+
+  if (!assinatura.plano) return;
+
   // Só mensalidade já com o valor do plano novo: a do mês pago antes da
   // troca (que pode receber outro aviso, ex.: CONFIRMED e depois RECEIVED
   // no cartão) tem o valor antigo.
@@ -494,7 +516,7 @@ async function aplicarPlanoContratado(empresaId: string, pagamento: AsaasPagamen
     Boolean(pagamento.subscription) &&
     pagamento.subscription === assinatura.asaas_subscription_id &&
     Number(pagamento.value) === Number(assinatura.valor);
-  if (!eDiferenca && !eMensalidade) return;
+  if (!eMensalidade) return;
 
   // Mensalidade paga antes da diferença: a diferença não é mais devida.
   if (eMensalidade && assinatura.upgrade_pagamento_id) {
@@ -514,6 +536,47 @@ async function aplicarPlanoContratado(empresaId: string, pagamento: AsaasPagamen
   if (assinatura.plano !== empresa.plano) {
     await supabaseAdmin.from("empresas").update({ plano: assinatura.plano }).eq("id", empresaId);
   }
+}
+
+// Confere no Asaas as cobranças da loja e aplica o que o webhook não
+// aplicou (aviso perdido, fila do webhook pausada...). Usada ao abrir a
+// tela de Assinatura.
+export async function conferirNoAsaas(empresaId: string) {
+  const { data: assinatura } = await supabaseAdmin
+    .from("assinaturas")
+    .select("asaas_subscription_id, upgrade_pagamento_id")
+    .eq("empresa_id", empresaId)
+    .maybeSingle();
+
+  if (!assinatura) return;
+
+  if (assinatura.asaas_subscription_id) {
+    await sincronizarCobrancas(empresaId, assinatura.asaas_subscription_id);
+  }
+
+  // Diferenças de upgrade (pela referência, mesmo que o id não tenha sido
+  // guardado).
+  const avulsas = new Map<string, AsaasPagamento>();
+  for (const referencia of [`upgrade:${empresaId}`, ...Object.keys(PLANOS).map((p) => `upgrade:${empresaId}:${p}`)]) {
+    for (const cobranca of await listarCobrancasPorReferencia(referencia)) avulsas.set(cobranca.id, cobranca);
+  }
+
+  if (assinatura.upgrade_pagamento_id && !avulsas.has(assinatura.upgrade_pagamento_id)) {
+    const cobranca = await buscarCobranca(assinatura.upgrade_pagamento_id).catch(() => null);
+    if (cobranca) avulsas.set(cobranca.id, cobranca);
+  }
+
+  for (const cobranca of avulsas.values()) await salvarPagamento(empresaId, cobranca);
+
+  await recalcularStatus(empresaId);
+
+  // Só as diferenças pagas: aplicar mensalidades antigas aqui poderia
+  // antecipar uma redução de plano agendada (isso fica com o webhook).
+  const pagas = [...avulsas.values()]
+    .filter((c) => PAGOS.includes(c.status) && !c.deleted)
+    .sort((a, b) => (a.paymentDate || a.dueDate).localeCompare(b.paymentDate || b.dueDate));
+
+  for (const cobranca of pagas) await aplicarPlanoContratado(empresaId, cobranca);
 }
 
 async function empresaDoAsaas(subscriptionId?: string | null, customerId?: string | null) {

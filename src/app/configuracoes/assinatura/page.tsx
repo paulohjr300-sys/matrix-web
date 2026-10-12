@@ -110,7 +110,7 @@ export default function AssinaturaPage() {
     }
 
     const load = useCallback(async () => {
-        const response = await fetch('/api/assinatura', { cache: 'no-store' })
+        const response = await fetch('/api/assinatura?conferir=1', { cache: 'no-store' })
         const result = await response.json().catch(() => null)
 
         if (!response.ok || !result) {
