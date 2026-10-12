@@ -142,6 +142,39 @@ export default function VendasPage() {
         void loadInitialData()
     }, [])
 
+    function handleEditSale(sale: Sale) {
+        setEditingSaleId(sale.id)
+        setVehicleId(sale.vehicle_id)
+        setSaleDate(sale.sale_date || '')
+        setSalePrice(formatCurrency(Number(sale.sale_price)))
+        setPaymentMethod(sale.payment_method || '')
+        setNotes(sale.notes || '')
+        setShowForm(true)
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+
+    // Na edição, o veículo da venda (já vendido) também entra na lista.
+    const editingSale = editingSaleId ? sales.find((sale) => sale.id === editingSaleId) : null
+    const vehicleOptions =
+        editingSale?.vehicles && !vehicles.some((vehicle) => vehicle.id === editingSale.vehicle_id)
+            ? [editingSale.vehicles, ...vehicles]
+            : vehicles
+
+    async function marcarVendido(id: string) {
+        await supabase
+            .from('vehicles')
+            .update({
+                status: 'VENDIDO',
+                is_published: false,
+            })
+            .eq('id', id)
+
+        // Vendido: encerra os anúncios nos portais.
+        void sincronizarAnuncios(id).then((erros) => {
+            if (erros.length) showToast('error', 'Anúncios nos portais', erros.join(' '))
+        })
+    }
+
     async function handleSaveSale() {
         if (!vehicleId) {
             showToast('error', 'Erro', 'Selecione um veículo.')
@@ -172,6 +205,16 @@ export default function VendasPage() {
                 .eq('id', editingSaleId)
 
             error = result.error
+
+            // Trocou o veículo da venda: o anterior volta para o estoque.
+            if (!error && editingSale && editingSale.vehicle_id !== vehicleId) {
+                await supabase
+                    .from('vehicles')
+                    .update({ status: 'EM_ESTOQUE' })
+                    .eq('id', editingSale.vehicle_id)
+
+                await marcarVendido(vehicleId)
+            }
         } else {
             const result = await supabase
                 .from('vehicle_sales')
@@ -179,20 +222,7 @@ export default function VendasPage() {
 
             error = result.error
 
-            if (!error) {
-                await supabase
-                    .from('vehicles')
-                    .update({
-                        status: 'VENDIDO',
-                        is_published: false,
-                    })
-                    .eq('id', vehicleId)
-
-                // Vendido: encerra os anúncios nos portais.
-                void sincronizarAnuncios(vehicleId).then((erros) => {
-                    if (erros.length) showToast('error', 'Anúncios nos portais', erros.join(' '))
-                })
-            }
+            if (!error) await marcarVendido(vehicleId)
         }
 
         if (error) {
@@ -268,7 +298,7 @@ export default function VendasPage() {
                                 >
                                     <option value="">Selecione</option>
 
-                                    {vehicles.map((vehicle) => (
+                                    {vehicleOptions.map((vehicle) => (
                                         <option key={vehicle.id} value={vehicle.id}>
                                             {getVehicleLabel(vehicle)}
                                         </option>
@@ -328,7 +358,7 @@ export default function VendasPage() {
                             disabled={loading}
                             className="mt-6 rounded-xl bg-zinc-950 px-6 py-3 text-white"
                         >
-                            {loading ? 'Salvando...' : 'Salvar venda'}
+                            {loading ? 'Salvando...' : editingSaleId ? 'Salvar alterações' : 'Salvar venda'}
                         </button>
                     </div>
                 )}
@@ -365,7 +395,9 @@ export default function VendasPage() {
                                     <td className="px-5 py-4">
                                         <div className="flex justify-end gap-2">
                                             <button
-                                                className="rounded-xl bg-zinc-100 p-2"
+                                                onClick={() => handleEditSale(sale)}
+                                                title="Editar venda"
+                                                className="rounded-xl bg-zinc-100 p-2 transition hover:bg-zinc-200"
                                             >
                                                 <Pencil size={18} />
                                             </button>
