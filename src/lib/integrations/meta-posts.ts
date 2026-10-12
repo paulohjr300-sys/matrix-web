@@ -58,6 +58,8 @@ export function metaAuthorizationUrl(state: string) {
     state,
     scope: ESCOPOS.join(","),
     response_type: "code",
+    // Pede de novo o que foi recusado antes (ex.: página desmarcada).
+    auth_type: "rerequest",
   });
 
   return `https://www.facebook.com/${VERSAO}/dialog/oauth?${params}`;
@@ -141,16 +143,48 @@ type PaginaApi = {
   instagram_business_account?: { id: string; username?: string };
 };
 
+const CAMPOS_PAGINA = "id,name,access_token,instagram_business_account{id,username}";
+
 async function paginasDoUsuario(userToken: string) {
   const data = await graph<{ data: PaginaApi[] }>("/me/accounts", {
+    params: { fields: CAMPOS_PAGINA, limit: "100", access_token: userToken },
+  });
+
+  if (data.data?.length) return data.data;
+
+  // Páginas de um portfólio empresarial (Meta Business Suite) podem não
+  // aparecer em /me/accounts: pega os ids das páginas autorizadas nas
+  // permissões do token e consulta cada uma.
+  const { data: token } = await graph<{
+    data: { granular_scopes?: { scope: string; target_ids?: string[] }[] };
+  }>("/debug_token", {
     params: {
-      fields: "id,name,access_token,instagram_business_account{id,username}",
-      limit: "100",
-      access_token: userToken,
+      input_token: userToken,
+      access_token: `${process.env.META_APP_ID}|${process.env.META_APP_SECRET}`,
     },
   });
 
-  return data.data || [];
+  const ids = new Set<string>();
+  for (const escopo of token.granular_scopes || []) {
+    if (["pages_show_list", "pages_manage_posts", "pages_read_engagement"].includes(escopo.scope)) {
+      for (const id of escopo.target_ids || []) ids.add(id);
+    }
+  }
+
+  const paginas: PaginaApi[] = [];
+
+  for (const id of ids) {
+    const pagina = await graph<PaginaApi>(`/${id}`, {
+      params: { fields: CAMPOS_PAGINA, access_token: userToken },
+    }).catch((error) => {
+      console.error("Erro ao ler página autorizada", id, error);
+      return null;
+    });
+
+    if (pagina?.access_token) paginas.push(pagina);
+  }
+
+  return paginas;
 }
 
 function resumo(pagina: PaginaApi): PaginaMeta {
@@ -170,7 +204,7 @@ export async function salvarConexaoMeta(empresaId: string, userToken: string, ex
 
   if (!paginas.length) {
     throw new PortalError(
-      "Nenhuma página do Facebook foi autorizada. Conecte de novo e marque a página da loja na lista da Meta.",
+      "Nenhuma página do Facebook foi autorizada. Remova o app Painel em facebook.com > Configurações > Integrações comerciais, conecte de novo e marque a página da loja e o Instagram na lista da Meta.",
     );
   }
 
