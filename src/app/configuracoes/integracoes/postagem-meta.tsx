@@ -102,6 +102,51 @@ export function PostagemMeta({
                 </p>
             ) : (
                 <div className="mt-4 space-y-4">
+                    <details
+                        open={!conexao}
+                        className="rounded-2xl bg-zinc-50 p-4 text-sm text-zinc-700 ring-1 ring-zinc-200"
+                    >
+                        <summary className="cursor-pointer font-semibold text-zinc-900">
+                            Antes de conectar: confira 3 coisas
+                        </summary>
+                        <ol className="mt-3 list-decimal space-y-2 pl-5 leading-6">
+                            <li>
+                                <strong>A loja tem uma página no Facebook</strong> e você é administrador dela. Confira em{' '}
+                                <a
+                                    href="https://www.facebook.com/pages/?category=your_pages"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="font-semibold text-brand-600 hover:underline"
+                                >
+                                    suas páginas
+                                </a>
+                                .
+                            </li>
+                            <li>
+                                <strong>O Instagram da loja é uma conta profissional</strong>: no app do Instagram, Perfil →
+                                ☰ → Tipo de conta e ferramentas → Mudar para conta profissional (Empresa).
+                            </li>
+                            <li>
+                                <strong>O Instagram está ligado à página</strong>: no Instagram, Editar perfil → Página →
+                                Conectar; ou na página do Facebook, Configurações → Contas vinculadas → Instagram.
+                            </li>
+                        </ol>
+                        <p className="mt-3 leading-6">
+                            Ao conectar, entre com o seu Facebook pessoal (o que administra a página) e{' '}
+                            <strong>marque a página e o Instagram da loja</strong> na lista que a Meta mostrar. Se a
+                            página não aparecer, remova o app em{' '}
+                            <a
+                                href="https://www.facebook.com/settings/?tab=business_tools"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="font-semibold text-brand-600 hover:underline"
+                            >
+                                Integrações comerciais
+                            </a>{' '}
+                            e conecte de novo.
+                        </p>
+                    </details>
+
                     {conexao?.ultimoErro && conexao.status !== 'conectado' && (
                         <p className="text-sm text-red-700">{conexao.ultimoErro}</p>
                     )}
