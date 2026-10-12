@@ -193,6 +193,44 @@ async function paginasDoUsuario(userToken: string) {
     if (pagina?.access_token) paginas.push(pagina);
   }
 
+  if (paginas.length) return paginas;
+
+  // Acesso à página pelo portfólio empresarial (e não como administrador
+  // direto da página): páginas próprias e de clientes de cada empresa.
+  const empresas = await graph<{
+    data: { id: string; owned_pages?: { data: PaginaApi[] }; client_pages?: { data: PaginaApi[] } }[];
+  }>("/me/businesses", {
+    params: {
+      fields: `id,owned_pages.limit(100){${CAMPOS_PAGINA}},client_pages.limit(100){${CAMPOS_PAGINA}}`,
+      limit: "50",
+      access_token: userToken,
+    },
+  }).catch((error) => {
+    console.error("Erro ao listar empresas do usuário", error);
+    return { data: [] };
+  });
+
+  const vistas = new Set<string>();
+
+  for (const empresa of empresas.data || []) {
+    for (const pagina of [...(empresa.owned_pages?.data || []), ...(empresa.client_pages?.data || [])]) {
+      if (pagina.access_token && !vistas.has(pagina.id)) {
+        vistas.add(pagina.id);
+        paginas.push(pagina);
+      }
+    }
+  }
+
+  console.info("Meta: páginas encontradas", {
+    granular: [...ids],
+    empresas: (empresas.data || []).map((e) => ({
+      id: e.id,
+      proprias: e.owned_pages?.data?.length || 0,
+      clientes: e.client_pages?.data?.length || 0,
+    })),
+    comToken: paginas.length,
+  });
+
   return paginas;
 }
 
@@ -225,7 +263,7 @@ export async function salvarConexaoMeta(empresaId: string, userToken: string, ex
       `Nenhuma página do Facebook foi autorizada. ` +
         (faltando.length
           ? `A Meta não concedeu: ${faltando.join(", ")}. Confira se essas permissões estão adicionadas nos casos de uso do app e conecte de novo.`
-          : "Remova o app em facebook.com > Configurações > Integrações comerciais, conecte de novo e marque a página da loja e o Instagram na lista da Meta."),
+          : "Todas as permissões foram concedidas, mas a conta do Facebook usada não administra nenhuma página. Entre com a conta que é administradora da página da loja (ou dê a ela acesso total à página) e conecte de novo."),
     );
   }
 
