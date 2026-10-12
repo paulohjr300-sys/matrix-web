@@ -1164,7 +1164,16 @@ export default function VeiculosPage() {
 
         await loadVehicles()
 
-        if (newValue) void syncPortals(editingVehicleId)
+        // Mercado Livre e post usam os dados salvos: com fotos novas ainda não
+        // enviadas, esperam o "Salvar" (que dispara a publicação automática).
+        if (newValue && pendingFiles.length === 0) void syncPortals(editingVehicleId)
+        else if (newValue) {
+            showToast(
+                'success',
+                'Publicado no site',
+                'O Mercado Livre e o post nas redes saem quando você salvar o veículo com as fotos novas.'
+            )
+        }
     }
     return (
         <>
