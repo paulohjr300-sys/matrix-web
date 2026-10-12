@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabase'
 import { PainelLogo } from '../components/brand/painel-logo'
+import { Captcha, CAPTCHA_ATIVO, type CaptchaHandle } from '../components/captcha'
 
 export default function LoginPage() {
     const router = useRouter()
@@ -14,6 +15,19 @@ export default function LoginPage() {
     const [loading, setLoading] = useState(false)
     const [message, setMessage] = useState('')
     const [messageType, setMessageType] = useState<'success' | 'error'>('error')
+    const captcha = useRef<CaptchaHandle>(null)
+    const [captchaToken, setCaptchaToken] = useState('')
+
+    // Cada token do captcha vale uma tentativa: depois de usar, gera outro.
+    function renovarCaptcha() {
+        void captcha.current?.novoToken().catch(() => undefined)
+    }
+
+    function erroDoLogin(mensagem?: string) {
+        return /captcha/i.test(mensagem || '')
+            ? 'Confirme que você não é um robô e tente de novo.'
+            : 'E-mail ou senha inválidos.'
+    }
 
     async function handleLogin() {
         setMessage('')
@@ -30,12 +44,14 @@ export default function LoginPage() {
         const { data: loginData, error } = await supabase.auth.signInWithPassword({
             email,
             password,
+            options: captchaToken ? { captchaToken } : undefined,
         })
 
         if (error || !loginData.user) {
             setLoading(false)
             setMessageType('error')
-            setMessage('E-mail ou senha inválidos.')
+            setMessage(erroDoLogin(error?.message))
+            renovarCaptcha()
             return
         }
 
@@ -94,13 +110,26 @@ export default function LoginPage() {
             return
         }
 
+        if (CAPTCHA_ATIVO && !captchaToken) {
+            setMessageType('error')
+            setMessage('Aguarde a verificação de segurança e tente de novo.')
+            return
+        }
+
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
             redirectTo: `${window.location.origin}/reset-password`,
+            captchaToken: captchaToken || undefined,
         })
+
+        renovarCaptcha()
 
         if (error) {
             setMessageType('error')
-            setMessage('Não foi possível enviar o e-mail de recuperação.')
+            setMessage(
+                /captcha/i.test(error.message)
+                    ? 'Confirme que você não é um robô e tente de novo.'
+                    : 'Não foi possível enviar o e-mail de recuperação.'
+            )
             return
         }
 
@@ -160,9 +189,11 @@ export default function LoginPage() {
                         />
                     </div>
 
+                    <Captcha ref={captcha} onChange={setCaptchaToken} />
+
                     <button
                         type="submit"
-                        disabled={loading}
+                        disabled={loading || (CAPTCHA_ATIVO && !captchaToken)}
                         className="w-full rounded-xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
                     >
                         {loading ? 'Entrando...' : 'Entrar'}

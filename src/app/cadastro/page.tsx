@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabase'
 import { PainelLogo } from '../components/brand/painel-logo'
+import { Captcha, CAPTCHA_ATIVO, type CaptchaHandle } from '../components/captcha'
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://matrix-site-peach.vercel.app').replace(/\/$/, '')
 
@@ -47,6 +48,8 @@ export default function CadastroPage() {
     const [whatsapp, setWhatsapp] = useState('')
     const [acceptedTerms, setAcceptedTerms] = useState(false)
     const [website, setWebsite] = useState('')
+    const captcha = useRef<CaptchaHandle>(null)
+    const [captchaToken, setCaptchaToken] = useState('')
 
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<{ message: string; field?: Field } | null>(null)
@@ -74,12 +77,14 @@ export default function CadastroPage() {
                     whatsapp,
                     acceptedTerms,
                     website,
+                    captchaToken,
                 }),
             })
 
             const result = await response.json().catch(() => ({}))
 
             if (!response.ok) {
+                void captcha.current?.novoToken().catch(() => undefined)
                 setError({
                     message: result.message || 'Não foi possível concluir o cadastro.',
                     field: result.field,
@@ -87,7 +92,19 @@ export default function CadastroPage() {
                 return
             }
 
-            const { error: loginError } = await supabase.auth.signInWithPassword({ email, password })
+            // O token do captcha já foi usado no cadastro: o login pede outro.
+            const tokenLogin = await captcha.current?.novoToken().catch(() => null)
+
+            if (CAPTCHA_ATIVO && !tokenLogin) {
+                router.push('/login')
+                return
+            }
+
+            const { error: loginError } = await supabase.auth.signInWithPassword({
+                email,
+                password,
+                options: tokenLogin ? { captchaToken: tokenLogin } : undefined,
+            })
 
             if (loginError) {
                 router.push('/login')
@@ -248,9 +265,11 @@ export default function CadastroPage() {
                         </span>
                     </label>
 
+                    <Captcha ref={captcha} onChange={setCaptchaToken} />
+
                     <button
                         type="submit"
-                        disabled={loading}
+                        disabled={loading || (CAPTCHA_ATIVO && !captchaToken)}
                         className="w-full rounded-xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
                     >
                         {loading ? 'Criando sua loja...' : 'Criar minha loja'}

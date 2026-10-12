@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "../../../lib/supabase-admin";
 import { DEFAULT_CATALOG } from "../../../lib/default-catalog";
+import { captchaValido, ipDaRequisicao } from "../../../lib/turnstile";
 
 // Cadastro de uma loja nova pelo próprio cliente: cria a empresa, o usuário
 // ADMIN e o perfil, e popula os cadastros base. Se qualquer passo falhar,
@@ -32,6 +33,10 @@ export async function POST(request: Request) {
   // Campo invisível no formulário: só robôs o preenchem.
   if (String(body.website || "").trim()) {
     return NextResponse.json({ message: "Cadastro recebido." });
+  }
+
+  if (!(await captchaValido(body.captchaToken, ipDaRequisicao(request)))) {
+    return badRequest("Confirme que você não é um robô e tente de novo.");
   }
 
   const storeName = String(body.storeName || "").trim();

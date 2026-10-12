@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { requireRole } from "../../../../lib/auth-server";
 import { supabaseAdmin } from "../../../../lib/supabase-admin";
 
@@ -20,11 +19,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     const appUrl = process.env.NEXT_PUBLIC_APP_URL;
 
-    if (!supabaseUrl || !supabaseAnonKey || !appUrl) {
+    if (!appUrl) {
       return NextResponse.json(
         { message: "Variáveis de ambiente não configuradas." },
         { status: 500 },
@@ -45,9 +42,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    // Com a chave do servidor: o captcha do Supabase Auth não se aplica a
+    // ela, e este envio é feito pelo ADMIN já autenticado.
+    const { error } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
       redirectTo: `${appUrl}/reset-password`,
     });
 
