@@ -8,7 +8,7 @@ import { PortalError } from "./core";
 // Docs: developers.facebook.com/docs/instagram-platform/content-publishing
 // e developers.facebook.com/docs/pages-api/posts.
 
-const VERSAO = process.env.META_GRAPH_VERSION || "v23.0";
+const VERSAO = process.env.META_GRAPH_VERSION || "v26.0";
 const GRAPH = `https://graph.facebook.com/${VERSAO}`;
 
 const ESCOPOS = [
