@@ -7,6 +7,7 @@ import { PageContainer } from '../components/page-container'
 import { RouteGuard } from '../components/auth/route-guard'
 import { Toast } from '../components/ui/toast'
 import { supabase } from '../../lib/supabase'
+import { calcularResultado } from '../../lib/resultado-veiculo'
 
 type VehicleReport = {
     id: string
@@ -50,32 +51,9 @@ function getVehicleName(vehicle: VehicleReport) {
     return name || '-'
 }
 
+// Sem venda lançada: lucro e margem ficam nulos (não é prejuízo).
 function getNumbers(vehicle: VehicleReport) {
-    const purchase = Number(vehicle.purchase_price || 0)
-
-    const costs = (vehicle.vehicle_costs || []).reduce(
-        (sum, cost) => sum + Number(cost.amount || 0),
-        0
-    )
-
-    const investment = purchase + costs
-
-    const sale = (vehicle.vehicle_sales || []).reduce(
-        (sum, saleItem) => sum + Number(saleItem.sale_price || 0),
-        0
-    )
-
-    const profit = sale - investment
-    const margin = sale > 0 ? (profit / sale) * 100 : 0
-
-    return {
-        purchase,
-        costs,
-        investment,
-        sale,
-        profit,
-        margin,
-    }
+    return calcularResultado(vehicle)
 }
 
 export default function RelatoriosPage() {
@@ -181,7 +159,12 @@ export default function RelatoriosPage() {
             acc.costs += numbers.costs
             acc.investment += numbers.investment
             acc.sales += numbers.sale
-            acc.profit += numbers.profit
+
+            // Lucro só dos vendidos.
+            if (numbers.profit !== null) {
+                acc.profit += numbers.profit
+                acc.vendidosComValor += 1
+            }
 
             return acc
         },
@@ -195,6 +178,7 @@ export default function RelatoriosPage() {
             investment: 0,
             sales: 0,
             profit: 0,
+            vendidosComValor: 0,
         }
     )
 
@@ -232,7 +216,7 @@ export default function RelatoriosPage() {
                         />
 
                         <SummaryCard
-                            title="Lucro"
+                            title={totals.vendidosComValor === 1 ? 'Lucro (1 vendido)' : `Lucro (${totals.vendidosComValor} vendidos)`}
                             value={formatCurrency(totals.profit)}
                             icon={<TrendingUp size={22} />}
                             dark
@@ -402,8 +386,9 @@ export default function RelatoriosPage() {
                         </div>
 
                         <div className="mt-6 space-y-3">
-                            {[...filteredVehicles]
-                                .sort((a, b) => getNumbers(b).profit - getNumbers(a).profit)
+                            {filteredVehicles
+                                .filter((vehicle) => getNumbers(vehicle).profit !== null)
+                                .sort((a, b) => (getNumbers(b).profit ?? 0) - (getNumbers(a).profit ?? 0))
                                 .slice(0, 5)
                                 .map((vehicle, index) => {
                                     const numbers = getNumbers(vehicle)
@@ -426,20 +411,20 @@ export default function RelatoriosPage() {
 
                                             <strong
                                                 className={
-                                                    numbers.profit >= 0
+                                                    (numbers.profit ?? 0) >= 0
                                                         ? 'text-emerald-700'
                                                         : 'text-red-700'
                                                 }
                                             >
-                                                {formatCurrency(numbers.profit)}
+                                                {formatCurrency(numbers.profit ?? 0)}
                                             </strong>
                                         </div>
                                     )
                                 })}
 
-                            {filteredVehicles.length === 0 && (
+                            {totals.vendidosComValor === 0 && (
                                 <p className="rounded-2xl bg-zinc-50 p-5 text-sm text-zinc-500">
-                                    Nenhum veículo encontrado para montar o ranking.
+                                    Nenhum veículo vendido no filtro para montar o ranking.
                                 </p>
                             )}
                         </div>
@@ -489,16 +474,20 @@ export default function RelatoriosPage() {
                                             <td className="px-5 py-4">{formatCurrency(numbers.purchase)}</td>
                                             <td className="px-5 py-4">{formatCurrency(numbers.costs)}</td>
                                             <td className="px-5 py-4">{formatCurrency(numbers.investment)}</td>
-                                            <td className="px-5 py-4">{formatCurrency(numbers.sale)}</td>
+                                            <td className="px-5 py-4">
+                                                {numbers.vendido ? formatCurrency(numbers.sale) : <span className="text-zinc-400">Não vendido</span>}
+                                            </td>
                                             <td
-                                                className={`px-5 py-4 font-bold ${numbers.profit >= 0
-                                                    ? 'text-emerald-700'
-                                                    : 'text-red-700'
+                                                className={`px-5 py-4 font-bold ${numbers.profit === null
+                                                    ? 'text-zinc-400'
+                                                    : numbers.profit >= 0
+                                                        ? 'text-emerald-700'
+                                                        : 'text-red-700'
                                                     }`}
                                             >
-                                                {formatCurrency(numbers.profit)}
+                                                {numbers.profit === null ? '—' : formatCurrency(numbers.profit)}
                                             </td>
-                                            <td className="px-5 py-4">{formatPercent(numbers.margin)}</td>
+                                            <td className="px-5 py-4">{numbers.margin === null ? '—' : formatPercent(numbers.margin)}</td>
                                             <td className="px-5 py-4 text-right">
                                                 <Link
                                                     href={`/dre?vehicleId=${vehicle.id}`}
