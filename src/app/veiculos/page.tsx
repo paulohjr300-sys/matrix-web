@@ -72,6 +72,9 @@ type Vehicle = {
     notes: string | null
     status: string
     is_published: boolean
+    is_featured?: boolean | null
+    is_premium?: boolean | null
+    is_outlet?: boolean | null
     main_photo_file_id: string | null
     doors?: number | null
     description?: string | null
@@ -238,6 +241,8 @@ export default function VeiculosPage() {
     const [search, setSearch] = useState('')
     const [statusFilter, setStatusFilter] = useState('')
     const [isPublished, setIsPublished] = useState(false)
+    // Selos do site: viram etiqueta no anúncio e faixas na home do site.
+    const [selos, setSelos] = useState({ destaque: false, premium: false, oferta: false })
     const [mainPhotoFileId, setMainPhotoFileId] = useState<string | null>(null)
     const [publishedFilter, setPublishedFilter] = useState('')
 
@@ -315,6 +320,7 @@ export default function VeiculosPage() {
         setRenavam('')
         setNotes('')
         setIsPublished(false)
+        setSelos({ destaque: false, premium: false, oferta: false })
         setMainPhotoFileId(null)
         setStatus('EM_ESTOQUE')
         setFipe(EMPTY_FIPE)
@@ -415,6 +421,9 @@ export default function VeiculosPage() {
         status,
         main_photo_file_id,
         is_published,
+        is_featured,
+        is_premium,
+        is_outlet,
         doors,
         description,
         versao,
@@ -884,6 +893,9 @@ export default function VeiculosPage() {
             renavam: renavam || null,
             notes: notes.trim() || null,
             is_published: finalIsPublished,
+            is_featured: selos.destaque,
+            is_premium: selos.premium,
+            is_outlet: selos.oferta,
             main_photo_file_id: mainPhotoFileId,
             status,
             ...fipe,
@@ -1014,6 +1026,11 @@ export default function VeiculosPage() {
         setPendingFiles([])
         setShowForm(true)
         setIsPublished(vehicle.is_published || false)
+        setSelos({
+            destaque: vehicle.is_featured === true,
+            premium: vehicle.is_premium === true,
+            oferta: vehicle.is_outlet === true,
+        })
         setMainPhotoFileId(vehicle.main_photo_file_id || null)
         setDoors(vehicle.doors ? String(vehicle.doors) : '')
         setDescription(vehicle.description || '')
@@ -1554,6 +1571,37 @@ export default function VeiculosPage() {
                                             ? 'Este veículo aparece no site.'
                                             : 'Este veículo ainda não aparece no site.'}
                                     </p>
+                                </div>
+                                <div className="md:col-span-3">
+                                    <label className="text-sm font-medium text-zinc-700">
+                                        Selos no site{' '}
+                                        <span className="font-normal text-zinc-500">
+                                            (etiqueta no anúncio e faixa própria na página inicial do site)
+                                        </span>
+                                    </label>
+                                    <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                                        {([
+                                            ['destaque', 'Destaque', 'Aparece em "Veículos em destaque", no topo da página inicial.'],
+                                            ['premium', 'Premium', 'Entra na faixa "Linha Premium".'],
+                                            ['oferta', 'Oferta', 'Entra na faixa "Ofertas da semana".'],
+                                        ] as const).map(([chave, titulo, texto]) => (
+                                            <label
+                                                key={chave}
+                                                className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition ${selos[chave] ? 'border-brand-500 bg-brand-50' : 'border-zinc-200 hover:border-zinc-300'}`}
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selos[chave]}
+                                                    onChange={(event) => setSelos((atual) => ({ ...atual, [chave]: event.target.checked }))}
+                                                    className="mt-1 h-4 w-4 accent-brand-600"
+                                                />
+                                                <span>
+                                                    <span className="block text-sm font-semibold text-zinc-900">{titulo}</span>
+                                                    <span className="block text-xs text-zinc-500">{texto}</span>
+                                                </span>
+                                            </label>
+                                        ))}
+                                    </div>
                                 </div>
                                 <div className="md:col-span-3">
                                     <label className="text-sm font-medium text-zinc-700">

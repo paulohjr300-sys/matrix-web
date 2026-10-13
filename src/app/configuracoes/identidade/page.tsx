@@ -119,6 +119,9 @@ export default function IdentidadePage() {
         }, 3000)
     }
 
+    // Preço FIPE riscado nos anúncios do site (migração 20261010002700).
+    const [mostrarFipe, setMostrarFipe] = useState(true)
+
     function setField(field: keyof Identidade, value: string) {
         setForm((current) => ({ ...current, [field]: value }))
     }
@@ -137,6 +140,14 @@ export default function IdentidadePage() {
                 if (error || !data) throw error
 
                 setForm(toForm(data as unknown as Record<keyof Identidade, string | null>))
+
+                // Separado: até a migração rodar, a coluna não existe.
+                const { data: fipe } = await supabase
+                    .from('empresas')
+                    .select('mostrar_fipe')
+                    .eq('id', empresaId)
+                    .maybeSingle()
+                if (fipe) setMostrarFipe(fipe.mostrar_fipe !== false)
             } catch {
                 showToast('error', 'Erro', 'Não foi possível carregar a identidade da loja.')
             } finally {
@@ -216,6 +227,8 @@ export default function IdentidadePage() {
                 .eq('id', empresaId)
 
             if (error) throw error
+
+            await supabase.from('empresas').update({ mostrar_fipe: mostrarFipe }).eq('id', empresaId)
 
             showToast('success', 'Salvo', 'O site já está usando a nova identidade.')
         } catch {
@@ -453,6 +466,23 @@ export default function IdentidadePage() {
                                     title={form.site_titulo.trim() || form.nome.trim() || 'Sua loja'}
                                     icon={form.favicon_url || form.logo_url}
                                 />
+
+                                <label className="flex cursor-pointer items-start gap-3 rounded-2xl bg-zinc-50 p-4 ring-1 ring-zinc-200">
+                                    <input
+                                        type="checkbox"
+                                        checked={mostrarFipe}
+                                        onChange={(e) => setMostrarFipe(e.target.checked)}
+                                        className="mt-1 h-4 w-4 accent-brand-600"
+                                    />
+                                    <span>
+                                        <span className="block text-sm font-semibold text-zinc-900">
+                                            Mostrar o preço FIPE riscado nos anúncios do site
+                                        </span>
+                                        <span className="block text-xs text-zinc-500">
+                                            Só aparece quando o carro está abaixo da FIPE (ex.: &quot;FIPE R$ 169.316 · Por R$ 154.990&quot;).
+                                        </span>
+                                    </span>
+                                </label>
 
                                 <Field label="Descrição (aparece abaixo do título no Google e ao compartilhar no WhatsApp)">
                                     <textarea
